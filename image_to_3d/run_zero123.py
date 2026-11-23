@@ -69,7 +69,9 @@ def novel_views(image, azimuths, elevation=0.0, steps=50, scale=3.0, seed=0):
     return [Image.fromarray(o) for o in out]
 
 
-azimuths = [0, 30, 90, 180, 270]  # 0 は入力と同じ視点（再現できるかの確認）
+GEN = ROOT / "data" / "gen_views"
+GEN.mkdir(parents=True, exist_ok=True)
+azimuths = [0, 30, 90, 180, 270, 330]  # 0 は入力と同じ視点（再現できるかの確認）
 for coef in ("016", "128", "512"):
     image = load_object(STIM / f"stim01_studio/stim01_rot000_coef{coef}.png", 256, bg=1.0)
     torch.cuda.reset_peak_memory_stats()
@@ -77,4 +79,5 @@ for coef in ("016", "128", "512"):
     views = novel_views(image, azimuths)
     print(f"coef {coef}: {len(azimuths)} views {time.time() - t0:.0f}s, "
           f"peak VRAM {torch.cuda.max_memory_allocated() / 2**30:.2f} GB", flush=True)
-    hstack([image] + views, OUT / f"zero123_coef{coef}.png")
+    for az, v in zip(azimuths, views):
+        v.save(GEN / f"zero123_coef{coef}_az{az:03d}.png")

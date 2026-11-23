@@ -19,6 +19,8 @@ from tsr.system import TSR  # noqa: E402
 
 OUT = ROOT / "image_to_3d" / "figures"
 OUT.mkdir(exist_ok=True)
+GEN = ROOT / "data" / "gen_views"
+GEN.mkdir(parents=True, exist_ok=True)
 device = "cuda"
 
 t0 = time.time()
@@ -34,7 +36,8 @@ for coef in ("016", "128", "512"):  # 濁りが少ない・中間・多い
     with torch.no_grad():
         codes = model([image], device=device)
     t1 = time.time()
-    views = model.render(codes, n_views=6, height=256, width=256, return_type="pil")[0]
-    print(f"coef {coef}: 3D {t1 - t0:.1f}s, render 6 views {time.time() - t1:.1f}s, "
+    views = model.render(codes, n_views=12, height=256, width=256, return_type="pil")[0]  # 30 度刻み
+    print(f"coef {coef}: 3D {t1 - t0:.1f}s, render 12 views {time.time() - t1:.1f}s, "
           f"peak VRAM {torch.cuda.max_memory_allocated() / 2**30:.2f} GB", flush=True)
-    hstack([image.resize((256, 256))] + views, OUT / f"triposr_coef{coef}.png")
+    for i in (0, 1, 3, 6, 9, 11):
+        views[i].save(GEN / f"triposr_coef{coef}_az{i * 30:03d}.png")
