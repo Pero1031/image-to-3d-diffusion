@@ -8,7 +8,7 @@ import types
 
 import torch
 
-from common import ROOT, STIM, hstack, load_object
+from common import AZ, COEFS, CONDS, GEN, ROOT, load_object, stim_path, tag
 
 # メッシュ化と背景除去の部品は使わないので、空のモジュールで代用する（Windows でビルドが難しいため）
 for name in ("torchmcubes", "rembg"):
@@ -17,10 +17,6 @@ sys.modules["torchmcubes"].marching_cubes = None
 sys.path.insert(0, str(ROOT / "data/third_party/TripoSR"))
 from tsr.system import TSR  # noqa: E402
 
-OUT = ROOT / "image_to_3d" / "figures"
-OUT.mkdir(exist_ok=True)
-GEN = ROOT / "data" / "gen_views"
-GEN.mkdir(parents=True, exist_ok=True)
 device = "cuda"
 
 t0 = time.time()
@@ -29,15 +25,15 @@ model.renderer.set_chunk_size(8192)
 model.to(device)
 print(f"load: {time.time() - t0:.0f}s")
 
-for coef in ("016", "128", "512"):  # 濁りが少ない・中間・多い
-    image = load_object(STIM / f"stim01_studio/stim01_rot000_coef{coef}.png", 512, bg=0.5)
-    torch.cuda.reset_peak_memory_stats()
-    t0 = time.time()
-    with torch.no_grad():
-        codes = model([image], device=device)
-    t1 = time.time()
-    views = model.render(codes, n_views=12, height=256, width=256, return_type="pil")[0]  # 30 度刻み
-    print(f"coef {coef}: 3D {t1 - t0:.1f}s, render 12 views {time.time() - t1:.1f}s, "
-          f"peak VRAM {torch.cuda.max_memory_allocated() / 2**30:.2f} GB", flush=True)
-    for i in (0, 1, 3, 6, 9, 11):
-        views[i].save(GEN / f"triposr_coef{coef}_az{i * 30:03d}.png")
+# 作った 3D を 90 度刻みの 4 視点から描く（AZ と同じ並び）。このモデルに乱数はない
+for cond in CONDS:
+    out = GEN / tag(cond)
+    out.mkdir(parents=True, exist_ok=True)
+    for coef in COEFS:
+        image = load_object(stim_path(cond, coef), 512, bg=0.5)
+        with torch.no_grad():
+            codes = model([image], device=device)
+        views = model.render(codes, n_views=len(AZ), height=256, width=256, return_type="pil")[0]
+        for az, v in zip(AZ, views):
+            v.save(out / f"triposr_coef{coef}_az{az:03d}.png")
+    print(tag(cond), flush=True)

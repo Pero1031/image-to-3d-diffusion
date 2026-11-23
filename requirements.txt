@@ -4,3 +4,15 @@
 numpy
 matplotlib
 tqdm
+scipy
+pillow
+imageio
+# Part 2 (pretrained models)
+diffusers
+transformers>=4.40,<5
+accelerate
+safetensors
+huggingface_hub
+omegaconf
+einops
+trimesh
