@@ -28,7 +28,7 @@ def load_mnist(device):
     ds = datasets.MNIST(ROOT / "data", train=True, download=True)
     x = ds.data.float() / 127.5 - 1.0          # ノイズ（平均0・分散1）と釣り合う値域にする
     x = F.pad(x, (2, 2, 2, 2), value=-1.0)     # 2 回半分にできる大きさにする
-    return x[:, None].to(device)
+    return x[:, None].to(device), ds.targets.to(device)
 
 
 def save_grid(x, path, nrow):
@@ -49,7 +49,7 @@ def main():
     OUT.mkdir(exist_ok=True)
     (ROOT / "logs").mkdir(exist_ok=True)
 
-    data = load_mnist(device)
+    data, _ = load_mnist(device)
     ddpm = DDPM(device=device)
     model = UNet().to(device)
     # EMA: 重みの移動平均。生成にはこちらを使う（学習中の重みの揺れが画像に出にくい）

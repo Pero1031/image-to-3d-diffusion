@@ -51,3 +51,31 @@ class DDPM:
             if t in keep:
                 traj[t] = x.cpu()
         return x, traj
+
+    @torch.no_grad()
+    def ddim_sample(self, model, shape, device, steps=50, x=None):
+        """DDIM (Song et al., 2021) の決定的サンプラー。学習し直さずにステップ数を減らす。
+
+        各ステップで、予測したノイズから「完成画像の見積もり x0」を出し、
+        同じノイズ eps を使って、より手前の時刻のノイズ量に置き直す。新しい乱数は足さない。
+        """
+        x = torch.randn(shape, device=device) if x is None else x
+        ts = torch.linspace(self.T - 1, 0, steps, device=device).round().long()
+        for i, t in enumerate(ts):
+            eps = model(x, t.expand(shape[0]))
+            abar = self.abar[t]
+            abar_prev = self.abar[ts[i + 1]] if i + 1 < steps else torch.ones((), device=device)
+            x0 = (x - (1 - abar).sqrt() * eps) / abar.sqrt()
+            x = abar_prev.sqrt() * x0 + (1 - abar_prev).sqrt() * eps
+        return x
+
+
+def guided(model, y, scale):
+    """classifier-free guidance。条件つきの予測と条件なしの予測の差を scale 倍に伸ばす。
+
+    scale = 0 で条件なし、1 でふつうの条件つき、1 より大きいと条件をより強く反映する。
+    """
+    def eps(x, t):
+        e_cond, e_uncond = model(x, t, y), model(x, t, None)
+        return e_uncond + scale * (e_cond - e_uncond)
+    return eps
