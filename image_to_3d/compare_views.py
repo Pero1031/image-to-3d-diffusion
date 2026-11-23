@@ -45,6 +45,13 @@ def gt_image(coef, az):
     return load_object(GT / f"gt_coef{int(coef):03d}_az{az:03d}.png", 256, bg=1.0)
 
 
+OPAQUE = {"016": 342, "128": 424, "512": 521}   # 正面（0 度）の平均輝度が半透明と揃うように選んだ反射率 x1000
+
+
+def opaque_image(coef, az):
+    return load_object(GT / f"gt_opaque{OPAQUE[coef]:04d}_az{az:03d}.png", 256, bg=1.0)
+
+
 def gen_image(model, coef, az, sign):
     return Image.open(GEN / f"{model}_coef{coef}_az{(sign * az) % 360:03d}.png").convert("RGB")
 
@@ -57,12 +64,13 @@ for model in ("zero123", "triposr"):
     signs[model] = max(score, key=score.get)
     print(f"{model}: azimuth sign {signs[model]:+d}  (IoU +30: {score[1]:.3f}, -30: {score[-1]:.3f})")
 
-rows = [("Blender (ground truth)", lambda c, a: gt_image(c, a)),
+rows = [("Blender, translucent (truth)", lambda c, a: gt_image(c, a)),
+        ("Blender, opaque (control)", opaque_image),
         ("Zero-1-to-3", lambda c, a: gen_image("zero123", c, a, signs["zero123"])),
         ("TripoSR", lambda c, a: gen_image("triposr", c, a, signs["triposr"]))]
 table = {}
 for coef in COEFS:
-    fig, axes = plt.subplots(3, len(AZ), figsize=(2.2 * len(AZ), 7))
+    fig, axes = plt.subplots(4, len(AZ), figsize=(2.2 * len(AZ), 9.2))
     for r, (name, get) in enumerate(rows):
         for c, az in enumerate(AZ):
             im = get(coef, az)
@@ -85,12 +93,20 @@ for k, label in enumerate(("mean luminance", "contrast (std / mean)")):
     for name, _ in rows:
         for coef, ls in zip(COEFS, (":", "--", "-")):
             axes[k].plot(range(len(AZ)), [table[name, coef, a][k] for a in AZ], ls, marker="o", ms=3,
-                         color={"B": "k", "Z": "C0", "T": "C1"}[name[0]], label=f"{name}, coef {coef}")
+                         color={"Blender, t": "k", "Blender, o": "0.6", "Zero-1-to-": "C0", "TripoSR": "C1"}[name[:10]], label=f"{name}, coef {coef}")
     axes[k].set_xticks(range(len(AZ)), AZ); axes[k].set_xlabel("azimuth (deg)"); axes[k].set_title(label)
 axes[1].legend(fontsize=6, ncol=1)
 fig.tight_layout(); fig.savefig(OUT / "compare_stats.png", dpi=120); plt.close(fig)
 
-print(f"{'':24s}{'coef':>5s}" + "".join(f"{a:>14d}" for a in AZ))
+print(f"{'':30s}{'coef':>5s}" + "".join(f"{a:>14d}" for a in AZ))
 for name, _ in rows:
     for coef in COEFS:
-        print(f"{name:24s}{coef:>5s}" + "".join("   {:.3f}/{:.3f}".format(*table[name, coef, a]) for a in AZ))
+        print(f"{name:30s}{coef:>5s}" + "".join("   {:.3f}/{:.3f}".format(*table[name, coef, a]) for a in AZ))
+
+# モデルの出力は、半透明の正解と不透明の対照のどちらに近いか（見えていない側 90・180・270 度の平均）
+print()
+print("unseen views (90, 180, 270 deg), mean over views: luminance / contrast")
+for coef in COEFS:
+    print(f"coef {coef}: " + "   ".join(
+        "{} {:.3f}/{:.3f}".format(name.split(",")[-1].split("(")[0].strip(),
+                                  *np.mean([table[name, coef, a] for a in (90, 180, 270)], axis=0)) for name, _ in rows))

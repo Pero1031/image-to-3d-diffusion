@@ -24,6 +24,8 @@ ap.add_argument("--out", type=Path, required=True)
 ap.add_argument("--hdri", type=Path, required=True)
 ap.add_argument("--coefs", type=int, nargs="+", default=[16, 128, 512])
 ap.add_argument("--azimuths", type=float, nargs="+", default=[0, 30, 90, 180, 270])
+ap.add_argument("--opaque-albedos", type=float, nargs="+", default=None,
+                help="指定すると、半透明の代わりに不透明の材質（同じ表面の光沢、中は拡散反射）で描く")
 ap.add_argument("--samples", type=int, default=512)
 ap.add_argument("--size", type=int, default=512)
 args = ap.parse_args(argv)
@@ -67,12 +69,30 @@ print(f"[gt] camera: elevation {math.degrees(math.atan2(z0, radius)):.2f} deg, d
 
 scene.render.image_settings.file_format = "PNG"
 scene.render.image_settings.color_mode = "RGBA"
-for coef in args.coefs:
-    nodes["VOLUME_SCATTER"].inputs["Density"].default_value, nodes["VOLUME_ABSORPTION"].inputs["Density"].default_value = PARAM[coef]
+def render_views(stem):
     for az in args.azimuths:
         phi = phi0 + math.radians(az)   # 上から見て反時計回りが正
         cam.location = (radius * math.cos(phi), radius * math.sin(phi), z0)
-        scene.render.filepath = str(args.out / f"gt_coef{coef:03d}_az{int(az):03d}.png")
+        scene.render.filepath = str(args.out / f"{stem}_az{int(az):03d}.png")
         t0 = time.perf_counter()
         bpy.ops.render.render(write_still=True)
-        print(f"[gt] coef {coef} az {az:.0f}: {time.perf_counter() - t0:.0f}s", flush=True)
+        print(f"[gt] {stem} az {az:.0f}: {time.perf_counter() - t0:.0f}s", flush=True)
+
+
+if args.opaque_albedos:
+    # 対照条件: 形・照明・表面の粗さと屈折率は同じで、光が中に入らない材質
+    tree = mat.node_tree
+    out = nodes["OUTPUT_MATERIAL"]
+    for link in list(tree.links):
+        tree.links.remove(link)
+    bsdf = tree.nodes.new("ShaderNodeBsdfPrincipled")
+    bsdf.inputs["Roughness"].default_value = nodes["BSDF_GLASS"].inputs["Roughness"].default_value
+    bsdf.inputs["IOR"].default_value = nodes["BSDF_GLASS"].inputs["IOR"].default_value
+    tree.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    for albedo in args.opaque_albedos:
+        bsdf.inputs["Base Color"].default_value = (albedo, albedo, albedo, 1.0)
+        render_views(f"gt_opaque{round(albedo * 1000):04d}")
+else:
+    for coef in args.coefs:
+        nodes["VOLUME_SCATTER"].inputs["Density"].default_value, nodes["VOLUME_ABSORPTION"].inputs["Density"].default_value = PARAM[coef]
+        render_views(f"gt_coef{coef:03d}")
