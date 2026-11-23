@@ -29,7 +29,9 @@ Everything was run on a Quadro M4000 (8 GB, Maxwell generation).
 **What holds:** on the unseen side, Zero-1-to-3 always produces stronger shading contrast than the real
 translucent object, and usually a darker one. **What does not hold as stated:** the outputs do not simply match
 an opaque object. That description fits the front-lit studio condition well, but over all conditions the
-outputs sit between the two references. Details and limits are below.
+outputs sit between the two references. Given matched translucent and opaque inputs, the model does change
+its far side in the right direction, but by only a fifth to a third of the true difference. Details and limits
+are below.
 
 ![Front-lit studio, low density](image_to_3d/figures/views_stim01_studio_rot000_coef016.png)
 
@@ -127,6 +129,38 @@ higher in contrast in all 6.
 
 ![Back-lit sunlight, low density](image_to_3d/figures/views_stim01_rustig_koppie_rot135_coef016.png)
 
+### Does the model tell the two materials apart?
+
+The comparison above shows that the output is wrong, not whether the model responds to the material at all. To
+test that, Zero-1-to-3 is given pairs of inputs that differ only in material: the translucent stimulus, and the
+opaque control with the same shape, lighting and front-view mean luminance. The measure was fixed before
+running: regress, across cells, the difference between the two model outputs on the difference between the two
+true far sides. A slope of 0 means the model ignores the material; 1 means it tracks it. The prediction was a
+slope near 0. Only the 10 cells where the front views could be matched are a fair pair.
+
+| Unseen views, 10 matched cells | Luminance | Contrast |
+|---|---|---|
+| Slope (model difference on true difference) | +0.21 | +0.35 |
+| Mean absolute true difference | 0.215 | 0.541 |
+| Mean absolute model difference | 0.057 | 0.199 |
+| Difference expected from seeds alone | 0.026 | 0.060 |
+| Cells where the model difference has the right sign | 7 / 10 | 9 / 10 |
+
+![pairs](image_to_3d/figures/pairs_scatter.png)
+
+**The prediction was wrong: the model does not ignore the material.** Its far side for the translucent input is
+brighter and lower in contrast than for the opaque input, in the right direction and above seed noise, but it
+recovers only about a fifth to a third of the true difference.
+
+![pairs example](image_to_3d/figures/pairs_example.png)
+
+*Front-lit studio, lowest density. The model keeps the two inputs apart, but it turns the translucent one into
+a glossy, metal-like object rather than one that lets light through.*
+
+This does not show that the model recognises translucency. A model that only carries the softness or
+glossiness of the front-view shading over to the far side would produce the same sign. The two inputs also
+differ in apparent surface detail, because refraction in the translucent object shows internal structure.
+
 ### Limits
 
 - Two shapes, two environment maps, one surface finish. Both shapes are irregular blobs.
@@ -149,7 +183,8 @@ higher in contrast in all 6.
 | `image_to_3d/render_all_gt.py` | Runs the Blender script for every condition and picks the control reflectance |
 | `image_to_3d/run_zero123.py` | Zero-1-to-3 sampling written on the pretrained weights |
 | `image_to_3d/run_triposr.py` | TripoSR inference and novel-view rendering |
-| `image_to_3d/analyze_all.py` | Tables, `figures/summary.json`, and all figures |
+| `image_to_3d/analyze_all.py` | Tables, `figures/summary.json`, and the comparison figures |
+| `image_to_3d/analyze_pairs.py` | The matched-pair test: translucent input against opaque input |
 
 Peak GPU memory: 6.5 GB for Zero-1-to-3 (4 views with guidance), 2.2 GB for TripoSR.
 
