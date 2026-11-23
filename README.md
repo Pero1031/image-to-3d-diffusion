@@ -66,51 +66,7 @@ A translucent object lets light through, so its far side can be bright, and its 
 behind. A model that sees one image has to invent the far side. Does it invent the far side of a translucent
 object, or of an opaque one?
 
-### Part 3: do the models' features carry perceived translucency?
-
-Part 2 looks at outputs. This part asks whether the information is present inside the models at all.
-
-- **Data.** 122 photographs of 61 soaps (two photos each) from the Translucent Image Dataset (Liao, Sawayama &
-  Xiao, 2023, CC BY 4.0), with translucency ratings on a 7-point scale from 6 observers collected in our lab.
-  Photographs and ratings are not in this repository.
-- **Target.** Ratings standardised per observer and averaged per photo. Split-half correlation between
-  observers is 0.95, so a perfect predictor would reach about r = 0.99.
-- **Object regions.** A background-removal network, checked against 61 hand-drawn contours (mean IoU 0.936);
-  four photos where it included the cast shadow were corrected by hand or with a second network, one is left.
-- **Features.** Zero-1-to-3: its CLIP image embedding, and U-Net activations (mid block and two up blocks,
-  averaged inside the object) when the photo is the conditioning image and its own noised latent is the input,
-  at three noise levels. TripoSR: its DINO image tokens. Baselines: 14 image statistics used in the lab
-  (luminance, contrast, highlight and spectral measures) and mean colour.
-- **Prediction.** Ridge regression, leaving one soap out at a time so that both photos of a soap are always
-  held out together. Confidence intervals resample soaps; chance is from 200 permutations of ratings over soaps.
-
-| Features | Dimensions | r, held-out soaps | 95% CI |
-|---|---|---|---|
-| Mean colour | 6 | 0.57 | 0.42 to 0.69 |
-| 14 image statistics | 14 | 0.69 | 0.61 to 0.75 |
-| Image statistics + colour | 20 | 0.66 | 0.57 to 0.75 |
-| Zero-1-to-3 CLIP embedding (photo / object on white) | 768 | 0.92 / 0.93 | 0.90 to 0.95 |
-| Zero-1-to-3 U-Net, low / medium / high noise (object on white) | 3200 | 0.87 / 0.88 / 0.89 | 0.83 to 0.92 |
-| Zero-1-to-3 U-Net, low / medium / high noise (photo) | 3200 | 0.84 / 0.81 / 0.85 | 0.74 to 0.89 |
-| TripoSR DINO tokens (photo / object on white) | 768 | 0.86 / 0.82 | 0.74 to 0.90 |
-
-Chance level (95th percentile of permutations) is 0.14 to 0.23 for every row.
-
-![prediction](soap/figures/predict_r.png)
-
-- **Perceived translucency can be read out linearly from both models' features**, far better than from the
-  image statistics (+0.26 for the best model features over statistics + colour, 95% CI +0.18 to +0.35).
-- Removing the background changes little, so the prediction does not rest on shadows or light cast on the table.
-- Together with Part 2: the information that separates translucent from opaque is available to the model, but
-  the generated far side does not use it to change how light behaves. The failure is in what is rendered, not
-  in what is encoded.
-
-Limits: 61 objects and 6 observers. The embedding is a general-purpose image encoder used as is, so this says
-nothing about what training for 3D added. The U-Net receives the image itself, so high decodability there is
-expected. Soaps come in types (clear glycerine bars, milky bars), and a feature that recognises the type would
-also predict the rating; held-out soaps rule out memorising an object, not this. Decodable does not mean used.
-
-## Setup
+### Setup
 
 - **Inputs.** Existing path-traced stimuli from a perception experiment: two blob shapes with a glass surface
   and a homogeneous scattering volume. Scattering density takes three levels (16, 128, 512; higher is more
@@ -257,6 +213,50 @@ on a rated gloss dataset) were applied to the same images.
 | `soap/features.py`, `soap/predict.py` | Model features and image statistics; prediction of the ratings |
 
 Peak GPU memory: 6.5 GB for Zero-1-to-3 (4 views with guidance), 2.2 GB for TripoSR.
+
+## Part 3: do the models' features carry perceived translucency?
+
+Part 2 looks at outputs. This part asks whether the information is present inside the models at all.
+
+- **Data.** 122 photographs of 61 soaps (two photos each) from the Translucent Image Dataset (Liao, Sawayama &
+  Xiao, 2023, CC BY 4.0), with translucency ratings on a 7-point scale from 6 observers collected in our lab.
+  Photographs and ratings are not in this repository.
+- **Target.** Ratings standardised per observer and averaged per photo. Split-half correlation between
+  observers is 0.95, so a perfect predictor would reach about r = 0.99.
+- **Object regions.** A background-removal network, checked against 61 hand-drawn contours (mean IoU 0.936);
+  four photos where it included the cast shadow were corrected by hand or with a second network, one is left.
+- **Features.** Zero-1-to-3: its CLIP image embedding, and U-Net activations (mid block and two up blocks,
+  averaged inside the object) when the photo is the conditioning image and its own noised latent is the input,
+  at three noise levels. TripoSR: its DINO image tokens. Baselines: 14 image statistics used in the lab
+  (luminance, contrast, highlight and spectral measures) and mean colour.
+- **Prediction.** Ridge regression, leaving one soap out at a time so that both photos of a soap are always
+  held out together. Confidence intervals resample soaps; chance is from 200 permutations of ratings over soaps.
+
+| Features | Dimensions | r, held-out soaps | 95% CI |
+|---|---|---|---|
+| Mean colour | 6 | 0.57 | 0.42 to 0.69 |
+| 14 image statistics | 14 | 0.69 | 0.61 to 0.75 |
+| Image statistics + colour | 20 | 0.66 | 0.57 to 0.75 |
+| Zero-1-to-3 CLIP embedding (photo / object on white) | 768 | 0.92 / 0.93 | 0.90 to 0.95 |
+| Zero-1-to-3 U-Net, low / medium / high noise (object on white) | 3200 | 0.87 / 0.88 / 0.89 | 0.83 to 0.92 |
+| Zero-1-to-3 U-Net, low / medium / high noise (photo) | 3200 | 0.84 / 0.81 / 0.85 | 0.74 to 0.89 |
+| TripoSR DINO tokens (photo / object on white) | 768 | 0.86 / 0.82 | 0.74 to 0.90 |
+
+Chance level (95th percentile of permutations) is 0.14 to 0.23 for every row.
+
+![prediction](soap/figures/predict_r.png)
+
+- **Perceived translucency can be read out linearly from both models' features**, far better than from the
+  image statistics (+0.26 for the best model features over statistics + colour, 95% CI +0.18 to +0.35).
+- Removing the background changes little, so the prediction does not rest on shadows or light cast on the table.
+- Together with Part 2: the information that separates translucent from opaque is available to the model, but
+  the generated far side does not use it to change how light behaves. The failure is in what is rendered, not
+  in what is encoded.
+
+Limits: 61 objects and 6 observers. The embedding is a general-purpose image encoder used as is, so this says
+nothing about what training for 3D added. The U-Net receives the image itself, so high decodability there is
+expected. Soaps come in types (clear glycerine bars, milky bars), and a feature that recognises the type would
+also predict the rating; held-out soaps rule out memorising an object, not this. Decodable does not mean used.
 
 ## Setup
 
