@@ -109,3 +109,27 @@ for r, (name, get) in enumerate(rows):
             axes[r, c].set_ylabel(name, fontsize=8)
 fig.suptitle(f"{tag(cond)}, density {coef}", fontsize=10)
 fig.tight_layout(); fig.savefig(OUT / "pairs_example.png", dpi=90); plt.close(fig)
+
+# 追加の解析: モデルの裏側の差は、本物の裏側の差と、入力（正面）の差のどちらに従うか。
+# 「正面の見えを裏側へ持ち越しているだけ」なら、正面の差との相関のほうが高くなる。
+from common import stim_path  # noqa: E402
+
+
+def front(path):
+    return np.array(stats(*load_object(path, 256, bg=1.0, with_mask=True)))
+
+
+d_front = np.array([front(stim_path(c, k)) - front(GT / tag(c) / f"gt_opaque_coef{k}_az000.png") for c, k in keys])
+copy = {}
+print("\nmatched cells: does the model's far-side difference follow the truth or the front view of the input?")
+for i, name in enumerate(("luminance", "contrast")):
+    f, m, t = d_front[matched, i], d_model[matched, i], d_true[matched, i]
+    copy[name] = {"max_abs_front_diff": float(np.abs(f).max()), "r_model_front": float(np.corrcoef(m, f)[0, 1]),
+                  "r_model_truth": float(np.corrcoef(m, t)[0, 1]), "r_front_truth": float(np.corrcoef(f, t)[0, 1]),
+                  "same_sign_as_front": int((np.sign(f) == np.sign(m)).sum())}
+    print(f"{name:10s} largest front difference {np.abs(f).max():.3f}   r(model, front) {copy[name]['r_model_front']:+.2f}   "
+          f"r(model, truth) {copy[name]['r_model_truth']:+.2f}   r(front, truth) {copy[name]['r_front_truth']:+.2f}   "
+          f"same sign as front {copy[name]['same_sign_as_front']}/{matched.sum()}")
+summary["front_copy"] = copy
+with open(OUT / "pairs_summary.json", "w") as f:
+    json.dump(summary, f, indent=1)

@@ -44,5 +44,21 @@
    7,
    17
   ]
+ },
+ "front_copy": {
+  "luminance": {
+   "max_abs_front_diff": 0.019040822982788086,
+   "r_model_front": 0.6212813069430582,
+   "r_model_truth": 0.07982756083142917,
+   "r_front_truth": -0.08734580008246508,
+   "same_sign_as_front": 8
+  },
+  "contrast": {
+   "max_abs_front_diff": 0.6381465196609497,
+   "r_model_front": 0.7850469272290501,
+   "r_model_truth": 0.4758856259114912,
+   "r_front_truth": 0.046097487529645126,
+   "same_sign_as_front": 8
+  }
  }
 }

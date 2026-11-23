@@ -29,8 +29,9 @@ Everything was run on a Quadro M4000 (8 GB, Maxwell generation).
 **What holds:** on the unseen side, Zero-1-to-3 always produces stronger shading contrast than the real
 translucent object, and usually a darker one. **What does not hold as stated:** the outputs do not simply match
 an opaque object. That description fits the front-lit studio condition well, but over all conditions the
-outputs sit between the two references. Given matched translucent and opaque inputs, the model does change
-its far side in the right direction, but by only a fifth to a third of the true difference. Details and limits
+outputs sit between the two references. Given matched translucent and opaque inputs, the far side
+changes a little, and the change follows the front view of the input rather than the true far side. Yet the
+models' image encoders predict human translucency ratings of real photographs well (Part 3). Details and limits
 are below.
 
 ![Front-lit studio, low density](image_to_3d/figures/views_stim01_studio_rot000_coef016.png)
@@ -65,7 +66,51 @@ A translucent object lets light through, so its far side can be bright, and its 
 behind. A model that sees one image has to invent the far side. Does it invent the far side of a translucent
 object, or of an opaque one?
 
-### Setup
+### Part 3: do the models' features carry perceived translucency?
+
+Part 2 looks at outputs. This part asks whether the information is present inside the models at all.
+
+- **Data.** 122 photographs of 61 soaps (two photos each) from the Translucent Image Dataset (Liao, Sawayama &
+  Xiao, 2023, CC BY 4.0), with translucency ratings on a 7-point scale from 6 observers collected in our lab.
+  Photographs and ratings are not in this repository.
+- **Target.** Ratings standardised per observer and averaged per photo. Split-half correlation between
+  observers is 0.95, so a perfect predictor would reach about r = 0.99.
+- **Object regions.** A background-removal network, checked against 61 hand-drawn contours (mean IoU 0.936);
+  four photos where it included the cast shadow were corrected by hand or with a second network, one is left.
+- **Features.** Zero-1-to-3: its CLIP image embedding, and U-Net activations (mid block and two up blocks,
+  averaged inside the object) when the photo is the conditioning image and its own noised latent is the input,
+  at three noise levels. TripoSR: its DINO image tokens. Baselines: 14 image statistics used in the lab
+  (luminance, contrast, highlight and spectral measures) and mean colour.
+- **Prediction.** Ridge regression, leaving one soap out at a time so that both photos of a soap are always
+  held out together. Confidence intervals resample soaps; chance is from 200 permutations of ratings over soaps.
+
+| Features | Dimensions | r, held-out soaps | 95% CI |
+|---|---|---|---|
+| Mean colour | 6 | 0.57 | 0.42 to 0.69 |
+| 14 image statistics | 14 | 0.69 | 0.61 to 0.75 |
+| Image statistics + colour | 20 | 0.66 | 0.57 to 0.75 |
+| Zero-1-to-3 CLIP embedding (photo / object on white) | 768 | 0.92 / 0.93 | 0.90 to 0.95 |
+| Zero-1-to-3 U-Net, low / medium / high noise (object on white) | 3200 | 0.87 / 0.88 / 0.89 | 0.83 to 0.92 |
+| Zero-1-to-3 U-Net, low / medium / high noise (photo) | 3200 | 0.84 / 0.81 / 0.85 | 0.74 to 0.89 |
+| TripoSR DINO tokens (photo / object on white) | 768 | 0.86 / 0.82 | 0.74 to 0.90 |
+
+Chance level (95th percentile of permutations) is 0.14 to 0.23 for every row.
+
+![prediction](soap/figures/predict_r.png)
+
+- **Perceived translucency can be read out linearly from both models' features**, far better than from the
+  image statistics (+0.26 for the best model features over statistics + colour, 95% CI +0.18 to +0.35).
+- Removing the background changes little, so the prediction does not rest on shadows or light cast on the table.
+- Together with Part 2: the information that separates translucent from opaque is available to the model, but
+  the generated far side does not use it to change how light behaves. The failure is in what is rendered, not
+  in what is encoded.
+
+Limits: 61 objects and 6 observers. The embedding is a general-purpose image encoder used as is, so this says
+nothing about what training for 3D added. The U-Net receives the image itself, so high decodability there is
+expected. Soaps come in types (clear glycerine bars, milky bars), and a feature that recognises the type would
+also predict the rating; held-out soaps rule out memorising an object, not this. Decodable does not mean used.
+
+## Setup
 
 - **Inputs.** Existing path-traced stimuli from a perception experiment: two blob shapes with a glass surface
   and a homogeneous scattering volume. Scattering density takes three levels (16, 128, 512; higher is more
@@ -148,18 +193,40 @@ slope near 0. Only the 10 cells where the front views could be matched are a fai
 
 ![pairs](image_to_3d/figures/pairs_scatter.png)
 
-**The prediction was wrong: the model does not ignore the material.** Its far side for the translucent input is
-brighter and lower in contrast than for the opaque input, in the right direction and above seed noise, but it
-recovers only about a fifth to a third of the true difference.
+**The prediction was wrong: the two inputs do not give the same far side.** The difference is above seed noise
+and mostly has the sign of the true difference, but it is a fifth to a third of its size.
 
 ![pairs example](image_to_3d/figures/pairs_example.png)
 
-*Front-lit studio, lowest density. The model keeps the two inputs apart, but it turns the translucent one into
-a glossy, metal-like object rather than one that lets light through.*
+**The difference follows the front view of the input, not the true far side.** Across the 10 cells, the model's
+far-side contrast difference correlates 0.79 with the contrast difference between the two input images, and
+0.48 with the true far-side difference; the input difference and the true far-side difference are themselves
+unrelated (0.05). So the model carries the shading of the visible side over to the hidden side, and the
+agreement in sign with the truth is largely a by-product. Mean luminance is not explained this way: the two
+inputs were matched in front luminance (largest difference 0.019), yet the far side is 0.057 brighter for the
+translucent input. Ten cells, one of them with a much larger contrast difference than the rest.
 
-This does not show that the model recognises translucency. A model that only carries the softness or
-glossiness of the front-view shading over to the far side would produce the same sign. The two inputs also
-differ in apparent surface detail, because refraction in the translucent object shows internal structure.
+### Is the far side drawn as a glossy object?
+
+In the example above the translucent input becomes a metal-like object. Highlight cues from a separate project
+on gloss perception (highlight region = where a multi-scale centre-surround response exceeds a threshold fixed
+on a rated gloss dataset) were applied to the same images.
+
+| Unseen views, 10 matched cells | Highlight coverage | Highlight contrast | Highlight edge sharpness |
+|---|---|---|---|
+| Truth, translucent | 0.084 | 0.40 | 0.135 |
+| Truth, opaque | 0.099 | 0.68 | 0.076 |
+| Model, translucent input | 0.183 | 0.54 | 0.076 |
+| Model, opaque input | 0.194 | 0.60 | 0.058 |
+
+- The model's far side has about twice the highlight coverage of the true translucent object (larger in 9 of
+  10 cells) and higher highlight contrast (10 of 10).
+- This is not specific to translucent inputs: the opaque input gives the same coverage and contrast. The far
+  side is drawn highlight-rich whatever the material.
+- The input changes only the edge sharpness (sharper for the translucent input in 10 of 10), which again
+  matches the front views (0.134 against 0.086).
+- These cues also respond to shading edges and fine relief, and the generated shapes are more convoluted than
+  the true ones. Perceived gloss was not measured.
 
 ### Limits
 
@@ -185,6 +252,9 @@ differ in apparent surface detail, because refraction in the translucent object 
 | `image_to_3d/run_triposr.py` | TripoSR inference and novel-view rendering |
 | `image_to_3d/analyze_all.py` | Tables, `figures/summary.json`, and the comparison figures |
 | `image_to_3d/analyze_pairs.py` | The matched-pair test: translucent input against opaque input |
+| `image_to_3d/analyze_gloss.py` | Highlight cues of true and generated far sides (uses a separate gloss project) |
+| `soap/segment.py`, `soap/finalize.py` | Object regions for the soap photographs |
+| `soap/features.py`, `soap/predict.py` | Model features and image statistics; prediction of the ratings |
 
 Peak GPU memory: 6.5 GB for Zero-1-to-3 (4 views with guidance), 2.2 GB for TripoSR.
 
