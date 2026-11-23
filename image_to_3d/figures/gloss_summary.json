@@ -1,0 +1,68 @@
+{
+ "model: translucent input - opaque input": {
+  "coverage": {
+   "mean": -0.010426660244249628,
+   "positive": 4,
+   "n": 10
+  },
+  "contrast": {
+   "mean": -0.0567652616235945,
+   "positive": 4,
+   "n": 10
+  },
+  "sharp_grad": {
+   "mean": 0.018312816114889253,
+   "positive": 10,
+   "n": 10
+  },
+  "P_mean": {
+   "mean": -3.966538239789466e-07,
+   "positive": 3,
+   "n": 10
+  }
+ },
+ "truth: translucent - opaque": {
+  "coverage": {
+   "mean": -0.015575102926231921,
+   "positive": 3,
+   "n": 10
+  },
+  "contrast": {
+   "mean": -0.27970745712518696,
+   "positive": 0,
+   "n": 10
+  },
+  "sharp_grad": {
+   "mean": 0.058941156417131414,
+   "positive": 10,
+   "n": 10
+  },
+  "P_mean": {
+   "mean": -1.5094599800609862e-06,
+   "positive": 3,
+   "n": 10
+  }
+ },
+ "model(translucent in) - truth translucent": {
+  "coverage": {
+   "mean": 0.09938386923167855,
+   "positive": 9,
+   "n": 10
+  },
+  "contrast": {
+   "mean": 0.1384524956345558,
+   "positive": 10,
+   "n": 10
+  },
+  "sharp_grad": {
+   "mean": -0.058895176173084304,
+   "positive": 0,
+   "n": 10
+  },
+  "P_mean": {
+   "mean": 3.84014856575416e-06,
+   "positive": 9,
+   "n": 10
+  }
+ }
+}

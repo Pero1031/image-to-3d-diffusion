@@ -67,19 +67,20 @@ def novel_views(image, azimuths, elevation=0.0, steps=50, scale=3.0, seed=0):
     return [Image.fromarray(o) for o in out]
 
 
-# 全条件 x 濁り 3 段階 x 乱数 3 回。生成済みのものは飛ばす。
-# 入力は 2 種類: 半透明の刺激画像（zero123）と、同じ形・照明で正面の明るさを揃えた不透明の対照（zero123op）
-for cond in CONDS:
-    out = GEN / tag(cond)
-    out.mkdir(parents=True, exist_ok=True)
-    for coef in COEFS:
-        inputs = {"zero123": stim_path(cond, coef), "zero123op": GT / tag(cond) / f"gt_opaque_coef{coef}_az000.png"}
-        for name, path in inputs.items():
-            image = load_object(path, 256, bg=1.0)
-            for seed in SEEDS:
-                if (out / f"{name}_coef{coef}_az{AZ[-1]:03d}_seed{seed}.png").exists():
-                    continue
-                t0 = time.time()
-                for az, v in zip(AZ, novel_views(image, AZ, seed=seed)):
-                    v.save(out / f"{name}_coef{coef}_az{az:03d}_seed{seed}.png")
-                print(f"{tag(cond)} {name} coef {coef} seed {seed}: {time.time() - t0:.0f}s", flush=True)
+if __name__ == "__main__":
+    # 全条件 x 濁り 3 段階 x 乱数 3 回。生成済みのものは飛ばす。
+    # 入力は 2 種類: 半透明の刺激画像（zero123）と、同じ形・照明で正面の明るさを揃えた不透明の対照（zero123op）
+    for cond in CONDS:
+        out = GEN / tag(cond)
+        out.mkdir(parents=True, exist_ok=True)
+        for coef in COEFS:
+            inputs = {"zero123": stim_path(cond, coef), "zero123op": GT / tag(cond) / f"gt_opaque_coef{coef}_az000.png"}
+            for name, path in inputs.items():
+                image = load_object(path, 256, bg=1.0)
+                for seed in SEEDS:
+                    if (out / f"{name}_coef{coef}_az{AZ[-1]:03d}_seed{seed}.png").exists():
+                        continue
+                    t0 = time.time()
+                    for az, v in zip(AZ, novel_views(image, AZ, seed=seed)):
+                        v.save(out / f"{name}_coef{coef}_az{az:03d}_seed{seed}.png")
+                    print(f"{tag(cond)} {name} coef {coef} seed {seed}: {time.time() - t0:.0f}s", flush=True)
