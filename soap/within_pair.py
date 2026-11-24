@@ -123,11 +123,19 @@ for m, pp in (("method1", p1), ("method2", p2)):
 for k, v in comp.items():
     print(f"{k:45s} {v['diff']:+.3f}  95% CI [{v['ci'][0]:+.2f}, {v['ci'][1]:+.2f}]")
 
+# 追加: 画像統計の各指標と評定の関係。写真どうし（ほとんどが石けんどうしの差）と、同じ石けんの 2 枚の差とで比べる
+cues = {}
+print(f"\n{'image statistic':32s}{'r across photos':>17s}{'r within soaps':>16s}")
+for j, s in enumerate(data["stat_names"]):
+    v = data["stats14"][:, j].astype(np.float64)
+    cues[str(s)] = {"across": float(np.corrcoef(v, y)[0, 1]), "within": float(np.corrcoef(v[P[:, 0]] - v[P[:, 1]], d)[0, 1])}
+    print(f"{s:32s}{cues[str(s)]['across']:>+17.2f}{cues[str(s)]['within']:>+16.2f}")
+
 with open(OUT / "within_pair_summary.json", "w") as f:
     json.dump({"n_pairs": len(d), "split_half_r": sh, "reliability": rel, "ceiling_r": float(np.sqrt(rel)),
                "mean_abs_diff": float(np.abs(d).mean()), "median_abs_diff": float(np.median(np.abs(d))),
                "n_small": int((~large).sum()), "n_large": int(large.sum()), "rater_halves_same_sign": rater_sign,
-               "results": res, "comparisons": comp}, f, indent=1)
+               "results": res, "comparisons": comp, "image_statistic_cues": cues}, f, indent=1)
 
 # --- 図: 左 = 評定の差と予測の差（方法 1）、右 = 特徴ごとの相関 ---
 fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), gridspec_kw={"width_ratios": [1, 1.4]})

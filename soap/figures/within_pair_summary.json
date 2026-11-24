@@ -433,5 +433,63 @@
     0.23926386133238073
    ]
   }
+ },
+ "image_statistic_cues": {
+  "mean_luminance": {
+   "across": 0.08474345245073188,
+   "within": 0.28762896704803415
+  },
+  "luminance_std": {
+   "across": -0.5850499667574149,
+   "within": 0.24069575816263225
+  },
+  "rms_contrast": {
+   "across": -0.538626793384112,
+   "within": 0.07512085552368064
+  },
+  "luminance_skewness": {
+   "across": 0.3031844699720221,
+   "within": -0.14345389312645135
+  },
+  "luminance_kurtosis": {
+   "across": 0.20879597797877925,
+   "within": -0.1988686716645657
+  },
+  "highlight_area_fraction": {
+   "across": -0.11215781696608174,
+   "within": -0.06355906593093356
+  },
+  "highlight_contrast": {
+   "across": -0.3846176954076193,
+   "within": 0.2659807714837987
+  },
+  "saturation_mean": {
+   "across": 0.24586853266082484,
+   "within": -0.19026994028392774
+  },
+  "saturation_std": {
+   "across": -0.11860151470186872,
+   "within": -0.03309139551992996
+  },
+  "hue_circular_std": {
+   "across": -0.26214696878634874,
+   "within": 0.08829487282681425
+  },
+  "spectral_slope": {
+   "across": 0.2405406969769177,
+   "within": -0.17282167784910493
+  },
+  "high_freq_energy_ratio": {
+   "across": 0.4645930208141134,
+   "within": -0.20929846061944934
+  },
+  "subband_kurtosis_mean": {
+   "across": -0.39456098598706624,
+   "within": -0.09989420335172615
+  },
+  "highlight_sharpness": {
+   "across": 0.06590487173104656,
+   "within": 0.07483945828185903
+  }
  }
 }
