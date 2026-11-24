@@ -23,6 +23,9 @@ models' features carry human judgements of translucency. Everything ran on a Qua
   (r = 0.60), where image statistics fail.
 - **Used as a measure, the readout shows the copying.** The real object reads as more translucent from the far
   side than from the front; Zero-1-to-3's far side keeps the value of the front.
+- **Pushing the embedding barely reaches the image.** Zero-1-to-3's CLIP embedding is moved along the
+  translucency direction across the whole soap range. The far side gets slightly brighter and softer (17 of 18
+  cells), but only about 2% of the push reaches the output, as for random directions. The images stay metal-like.
 - **Gaze follows brightness.** Observers fixate the bright parts of the soap, not where the readout finds
   translucency.
 
@@ -214,6 +217,39 @@ the diagonal the far side scores the same as the front.*
 - Because Zero-1-to-3 is conditioned on the CLIP embedding, staying close to the input in CLIP space is partly
   expected for any property.
 
+### Pushing the embedding toward translucency
+
+If the CLIP embedding carries translucency, does Zero-1-to-3 use it? The embedding is moved along the
+translucency direction, defined as the change in embedding per rating unit across the 122 soap photos. The input
+latent and the noise stay fixed. Steps run from -2 to +2 rating units, and from end to end they span the whole
+range of the soap photos along this direction. Two control directions of the same length come from shuffled
+ratings. Step 0 reproduces the Part 2 images exactly. The prediction, written down before the run, was that the
+far side would turn more translucent than under the controls.
+
+| Far side, step +2 minus step -2, mean of 18 cells (cells that moved toward translucent) | Translucency | Control 1 | Control 2 |
+|---|---|---|---|
+| Luminance | +0.033 (17) | +0.004 (8) | -0.025 (4) |
+| Contrast | -0.110 (17) | -0.016 (10) | +0.089 (0) |
+| CLIP readout | +0.10 (16) | +0.03 (13) | -0.03 (5) |
+| DINO readout | +0.22 (17) | +0.09 (14) | -0.14 (6) |
+
+![steering](image_to_3d/figures/steer_curves.png)
+
+- **The direction is used, a little.** The far side gets brighter, lower in contrast and higher on both readouts
+  in 16 or 17 of 18 cells. On average that is two to three times the change under the controls. The input view
+  does not change.
+- **Most of the push is lost.** The push moves the readout of the embedding by 3.6 rating units, but the output's
+  CLIP readout moves by only 0.10. At +2 the far side closes about a quarter (CLIP) or a fifth (DINO) of the gap
+  to the true translucent far side, and the images still look like metal (`steer_example.png`). Over the whole
+  range, the contrast change is about two seed-to-seed SDs.
+- **The loss applies to every direction.** About 2% of the push shows up in the output's own CLIP embedding
+  along the pushed direction: 0.019 for translucency and 0.018 and 0.021 for the controls. The translucency
+  direction still stands out: per cell it beats both controls in 7 to 11 of 18 cells, against about 3 if it were
+  just another direction.
+- **So the generator can use the information but barely listens to its CLIP embedding.** Even a push across the
+  whole soap range closes only part of the gap. The far side is set mostly by the input latent and the model's
+  prior, so a better encoder alone would not fix it.
+
 ### Where observers look
 
 97% of fixations fall on the object, which is why summaries of how widely people look showed nothing. The
@@ -248,7 +284,7 @@ per patch on one colour scale. The signal covers the whole object.*
 - The encoders are general-purpose and used as is, so this says nothing about what training for 3D added.
 - The readout is trained on soap photos and applied to rendered blobs. Whether observers see the generated far
   side as less translucent has not been measured.
-- Decodable does not mean used.
+- The steering test used one model, one seed and two control directions.
 
 ## Related work
 
@@ -279,6 +315,7 @@ reported.
 | `image_to_3d/run_zero123.py`, `run_triposr.py` | Zero-1-to-3 sampling on the pretrained weights; TripoSR inference and rendering |
 | `image_to_3d/analyze_all.py`, `analyze_pairs.py`, `analyze_gloss.py` | Part 2 tables and figures; matched pairs; highlight cues |
 | `image_to_3d/translucency_readout.py` | The soap-trained readout applied to the Part 2 images |
+| `image_to_3d/steer_embedding.py` | Zero-1-to-3 with its CLIP embedding moved along the translucency direction |
 | `soap/segment.py`, `soap/finalize.py` | Object regions for the soap photos |
 | `soap/features.py`, `soap/predict.py`, `soap/ratings.py` | Features, rating loader, prediction of the ratings |
 | `soap/within_pair.py` | Two photos of the same soap; image-statistic cues |

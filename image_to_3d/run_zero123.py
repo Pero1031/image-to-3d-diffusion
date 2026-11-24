@@ -40,14 +40,17 @@ CLIP_STD = torch.tensor([0.26862954, 0.26130258, 0.27577711], device=device).vie
 
 
 @torch.no_grad()
-def novel_views(image, azimuths, elevation=0.0, steps=50, scale=3.0, seed=0):
-    """image: 256x256 の PIL（白背景）。azimuths: 入力視点からの水平回転（度）のリスト。"""
+def novel_views(image, azimuths, elevation=0.0, steps=50, scale=3.0, seed=0, emb_offset=None):
+    """image: 256x256 の PIL（白背景）。azimuths: 入力視点からの水平回転（度）のリスト。
+    emb_offset: CLIP 埋め込みに足すベクトル (768,)。埋め込みを操作する実験用で、None なら何もしない。"""
     n = len(azimuths)
     x = torch.from_numpy(np.asarray(image)).float().div(127.5).sub(1).permute(2, 0, 1)[None].to(device)
 
     # 条件 1: CLIP 埋め込み + 視点の変化（仰角の差、方位角の差の sin/cos、距離の差）
     c = torch.nn.functional.interpolate(x * 0.5 + 0.5, size=224, mode="bicubic", antialias=True)
     emb = clip((c - CLIP_MEAN) / CLIP_STD).image_embeds                       # (1, 768)
+    if emb_offset is not None:
+        emb = emb + torch.as_tensor(emb_offset, dtype=emb.dtype, device=device)[None]
     cam = torch.tensor([[math.radians(-elevation), math.sin(math.radians(a)), math.cos(math.radians(a)), 0.0]
                         for a in azimuths], device=device)
     ctx = proj(torch.cat([emb.expand(n, -1), cam], dim=1))[:, None]           # (n, 1, 768)
