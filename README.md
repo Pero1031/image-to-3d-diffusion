@@ -31,8 +31,10 @@ translucent object, and usually a darker one. **What does not hold as stated:** 
 an opaque object. That description fits the front-lit studio condition well, but over all conditions the
 outputs sit between the two references. Given matched translucent and opaque inputs, the far side
 changes a little, and the change follows the front view of the input rather than the true far side. Yet the
-models' image encoders predict human translucency ratings of real photographs well (Part 3). Details and limits
-are below.
+models' image encoders predict human translucency ratings of real photographs well, including the difference
+between two photos of the same soap (Part 3). Used as a translucency measure, that readout finds that
+Zero-1-to-3 gives the far side the same value as the input view, while the real far side scores as more
+translucent than its front. Details and limits are below.
 
 ![Front-lit studio, low density](image_to_3d/figures/views_stim01_studio_rot000_coef016.png)
 
@@ -211,6 +213,8 @@ on a rated gloss dataset) were applied to the same images.
 | `image_to_3d/analyze_gloss.py` | Highlight cues of true and generated far sides (uses a separate gloss project) |
 | `soap/segment.py`, `soap/finalize.py` | Object regions for the soap photographs |
 | `soap/features.py`, `soap/predict.py` | Model features and image statistics; prediction of the ratings |
+| `soap/ratings.py`, `soap/within_pair.py` | Rating loader and cross-validation; the test on two photos of the same soap |
+| `image_to_3d/translucency_readout.py` | The soap-trained readout applied to the Part 2 images |
 
 Peak GPU memory: 6.5 GB for Zero-1-to-3 (4 views with guidance), 2.2 GB for TripoSR.
 
@@ -251,12 +255,116 @@ Chance level (95th percentile of permutations) is 0.14 to 0.23 for every row.
 - Removing the background changes little, so the prediction does not rest on shadows or light cast on the table.
 - Together with Part 2: the information that separates translucent from opaque is available to the model, but
   the generated far side does not use it to change how light behaves. The failure is in what is rendered, not
-  in what is encoded.
+  in what is encoded. The two sections below check the first half of this (is the readout more than soap-type
+  recognition?) and the second half (what does the readout say about the generated far side?).
 
-Limits: 61 objects and 6 observers. The embedding is a general-purpose image encoder used as is, so this says
-nothing about what training for 3D added. The U-Net receives the image itself, so high decodability there is
-expected. Soaps come in types (clear glycerine bars, milky bars), and a feature that recognises the type would
-also predict the rating; held-out soaps rule out memorising an object, not this. Decodable does not mean used.
+### Same soap, two photos
+
+Only 5% of the variance of the ratings lies within soaps, so r = 0.93 mostly measures how well the features
+separate soaps. Recognising the kind of soap (clear glycerine bar, milky bar) would go a long way. The two
+photos of a soap show the same object under different light: one diffuse, the other a strong side or back
+light that also throws coloured, transmitted light onto the table. A readout that also follows the rating
+difference between the two photos responds to how the object looks, not only to which kind of soap it is.
+
+- **Test.** The readouts above (whole soaps held out) are applied to both photos of the held-out soap. The
+  difference between the two predictions is compared with the difference between the two ratings, using a
+  correlation about zero so that the order of the photos does not matter. No readout was trained on
+  differences within a soap. Chance comes from flipping the signs of the rating differences.
+- **Ceiling.** The differences are small (mean 0.31, against a standard deviation of 0.94 over photos) but
+  observers agree on them: split-half r = 0.70, so a perfect predictor would reach about r = 0.91.
+
+| Features | r across soaps (soap means) | r within soaps | 95% CI | p | Right direction, 29 large differences |
+|---|---|---|---|---|---|
+| Image statistics + colour | 0.72 | 0.01 | -0.23 to 0.26 | 0.47 | 14 |
+| 14 image statistics | 0.78 | -0.04 | -0.25 to 0.17 | 0.65 | 13 |
+| Zero-1-to-3 CLIP, object on white | 0.95 | 0.60 | 0.36 to 0.76 | 0.001 | 24 |
+| Zero-1-to-3 CLIP, photo | 0.95 | 0.47 | 0.17 to 0.67 | 0.005 | 19 |
+| Zero-1-to-3 U-Net, high noise, object on white | 0.92 | 0.55 | 0.31 to 0.73 | 0.001 | 24 |
+| TripoSR DINO, photo | 0.90 | 0.48 | 0.22 to 0.68 | 0.001 | 19 |
+| TripoSR DINO, object on white | 0.88 | 0.23 | 0.00 to 0.44 | 0.04 | 19 |
+
+Chance (95th percentile of sign flips) is 0.17 to 0.39. It is high for the model features because a few pairs
+with large predicted differences dominate the correlation.
+
+![within soap](soap/figures/within_pair.png)
+
+- **The model readouts follow differences within a soap; the image statistics do not.** The CLIP readout reaches
+  r = 0.60, two thirds of the ceiling, although it was trained only across soaps. The image-statistics readout
+  is at zero (difference +0.59, 95% CI +0.23 to +0.91). So the model features carry more than the kind of soap.
+- **This rests on the pairs where observers clearly see a difference** (split at the median rating difference,
+  0.21; this split was added after seeing the correlation). Among the 29 larger differences the CLIP readout
+  gives the right direction in 24; two halves of the observer panel agree on the direction in 90% of them.
+  Among the 32 smaller ones the two halves agree in only 41%, so there is no reliable direction to predict,
+  and the readout is at chance there (9 of 32).
+- Removing the background does not hurt the Zero-1-to-3 features (0.60 without, 0.47 with; the intervals
+  overlap widely), so the light cast on the table is not what they rely on. For DINO it goes the other way
+  (0.23 without, 0.48 with).
+- Fitting a readout directly to the 61 differences is weaker (CLIP 0.46, chance 0.22): too few examples.
+
+### The readout as a translucency measure for the Part 2 images
+
+The CLIP readout (object on white) is fitted to all 122 soap photos and applied to the Part 2 images, placed
+the same way (the object fills 85% of a white square). Its value is in units of the soap ratings. This puts
+the question of Part 2 in the model's own feature space: by the measure that predicts human ratings, does the
+far side that Zero-1-to-3 generates look translucent? A readout from TripoSR's DINO tokens gives a second
+measure. The check and the questions were written into the script before it was run; the comparison with the
+input view was added after seeing the first figure.
+
+- **Check.** On the far side the true translucent object scores above its opaque control in 18 of 18 cells
+  with both measures. In the front view, where the two were matched in mean luminance, it scores higher in 13
+  (CLIP) and 16 (DINO) of 18. So the measure carries over from photographs of soap to the rendered blobs, at
+  least where the true difference is large.
+
+| Mean over 18 cells | CLIP readout | DINO readout |
+|---|---|---|
+| Input (true front view), translucent | -0.06 | -0.67 |
+| True far side, translucent | +0.11 | -0.47 |
+| True far side, opaque control | -0.31 | -1.12 |
+| Zero-1-to-3, same view as the input | -0.03 | -0.95 |
+| Zero-1-to-3, far side | -0.02 | -1.22 |
+| TripoSR, same view as the input | -0.58 | -0.63 |
+| TripoSR, far side | -0.38 | -0.90 |
+
+![readout](image_to_3d/figures/readout_scatter.png)
+
+*Each point is one cell. Horizontal: readout of the input image. Vertical: readout of the far side (mean of
+90, 180 and 270 degrees). On the diagonal the far side scores the same as the front.*
+
+1. **The real translucent object scores as more translucent from the far side than from the front**: +0.17
+   with CLIP (higher in 15 of 18 cells), +0.20 with DINO.
+2. **Zero-1-to-3's far side keeps the value of the input view.** With CLIP its far side differs from its own
+   0-degree output by +0.00 and is below the true far side in 13 of 18 cells (seed SD 0.08). Across cells it
+   follows the input (partial r = 0.66 with the truth held fixed) more than the true far side (0.24 with the
+   input held fixed). It is not pulled down to the opaque control (-0.31); as in Part 2 it lies between the
+   two references.
+3. The DINO readout agrees for Zero-1-to-3: the far side is 0.26 below the model's own 0-degree output and below
+   the truth in 18 of 18 cells. But DINO also scores the 0-degree output 0.28 below the input, so it rates
+   generated images as less translucent overall.
+4. **Matched pairs** (10 cells). The far-side difference between translucent and opaque input is +0.20 (CLIP),
+   the same as the difference between the two inputs (+0.21) and half the true far-side difference (+0.39);
+   the sign agrees with the truth in 6 of 10. DINO gives +0.38, +0.34 and +0.67, and there the model's
+   difference correlates more with the input difference (0.86) than with the true one (0.50). In CLIP the
+   input and true differences are themselves correlated (0.93), so CLIP cannot separate them.
+5. **TripoSR: the two measures disagree.** Its blurry renders score low on CLIP already at 0 degrees and rise
+   towards the far side. On DINO, TripoSR's own encoder, the 0-degree render keeps the input value and the far
+   side falls by 0.28. No conclusion is drawn for TripoSR.
+
+So Zero-1-to-3 keeps the translucency that its conditioning embedding encodes for the visible side and copies
+it, unchanged, to the hidden side. It misses the increase that the real object shows away from the input view.
+Because the output is conditioned on this embedding, staying close to the input in CLIP space is expected for
+any property, not only translucency; the DINO measure, which the model never sees, shows the same pattern.
+
+### Limits of Part 3
+
+- 61 objects and 6 observers. The embedding is a general-purpose image encoder used as is, so this says nothing
+  about what training for 3D added. The U-Net receives the image itself, so high decodability there is
+  expected.
+- The within-soap test shows that the readout is not only soap-type recognition, but within-soap differences
+  are mostly a change of lighting, and the agreement comes from about 30 pairs.
+- The readout is trained on photographs of soap and applied to renders of blobs with a glass surface. The
+  front-view check passes in only 13 of 18 cells with CLIP. Readout values are not ratings of these images:
+  whether observers see the generated far side as less translucent than the true one is still unmeasured.
+- Decodable does not mean used.
 
 ## Related work and what is still open
 
