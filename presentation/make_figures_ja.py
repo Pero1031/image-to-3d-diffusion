@@ -62,9 +62,24 @@ def blank(ax):
         s.set_visible(False)
 
 
-def gt_image(cond, coef, az, opaque=False):
+SHOW_BG = 0.5     # 見せる図の背景（灰色）。白背景だと半透明の物体がくすんで見えるため。モデルへの入力は白背景のまま
+
+
+def gt_image(cond, coef, az, opaque=False, bg=1.0):
     name = f"gt_opaque_coef{coef}_az{az:03d}.png" if opaque else f"gt_coef{coef}_az{az:03d}.png"
-    return load_object(GT / tag(cond) / name, 256, bg=1.0, with_mask=True)
+    return load_object(GT / tag(cond) / name, 256, bg=bg, with_mask=True)
+
+
+def on_gray(im, bg=SHOW_BG):
+    """白背景の生成画像を灰色の背景に置き直す（表示用）。画像の縁につながる白い領域を背景とみなす。"""
+    from scipy import ndimage
+    a = np.asarray(im.convert("RGB")).astype(np.float32)
+    white = (a >= 250).all(-1)          # 生成画像の背景は 250 以上。明るい物体の縁を背景と取り違えないよう厳しめに
+    lab, _ = ndimage.label(white)
+    border = np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))
+    obj = ndimage.binary_erosion(~np.isin(lab, border[border > 0]), iterations=2)   # 縁に残る白い輪を落とす
+    m = ndimage.gaussian_filter(obj.astype(np.float32), 0.8)[..., None]
+    return Image.fromarray((a * m + bg * 255 * (1 - m)).round().astype(np.uint8))
 
 
 def gen_image(cond, name):
@@ -93,7 +108,7 @@ def fig_stimuli():
     for r, cond in enumerate(CONDS):
         for c, coef in enumerate(COEFS):
             ax = axes[r, c]
-            ax.imshow(load_object(stim_path(cond, coef), 256, bg=1.0)); blank(ax)
+            ax.imshow(load_object(stim_path(cond, coef), 256, bg=SHOW_BG)); blank(ax)
             if r == 0:
                 ax.set_title(f"{DENS[coef]}（{int(coef)}）", fontsize=11)
             if c == 0:
@@ -145,10 +160,10 @@ def fig_soaps():
 
 # ------------------------------------------------------------------ 図 3: 正解と生成の見た目
 def fig_views(cond, coef, name):
-    rows = (("正解（半透明）", lambda az: gt_image(cond, coef, az)[0]),
-            ("不透明の対照", lambda az: gt_image(cond, coef, az, opaque=True)[0]),
-            ("Zero-1-to-3 の生成", lambda az: gen_image(cond, f"zero123_coef{coef}_az{az:03d}_seed0.png")[0]),
-            ("TripoSR の生成", lambda az: fill_frame(gen_image(cond, f"triposr_coef{coef}_az{az:03d}.png")[0])))
+    rows = (("正解（半透明）", lambda az: gt_image(cond, coef, az, bg=SHOW_BG)[0]),
+            ("不透明の対照", lambda az: gt_image(cond, coef, az, opaque=True, bg=SHOW_BG)[0]),
+            ("Zero-1-to-3 の生成", lambda az: on_gray(gen_image(cond, f"zero123_coef{coef}_az{az:03d}_seed0.png")[0])),
+            ("TripoSR の生成", lambda az: on_gray(fill_frame(gen_image(cond, f"triposr_coef{coef}_az{az:03d}.png")[0]))))
     fig, axes = plt.subplots(len(rows), len(AZ), figsize=(9.6, 10.2))
     for r, (label, get) in enumerate(rows):
         for c, az in enumerate(AZ):
@@ -349,10 +364,10 @@ def fig_steer_curves(truth_far):
 
 def fig_steer_images(cond, coef):
     from steer_embedding import fname
-    rows = [("正解（半透明）", lambda az: gt_image(cond, coef, az)[0])]
+    rows = [("正解（半透明）", lambda az: gt_image(cond, coef, az, bg=SHOW_BG)[0])]
     for a in (-2, -1, 0, 1, 2):
         lab = {-2: "押す量 −2（不透明側）", 0: "押す量 0（元の生成）", 2: "押す量 +2（半透明側）"}.get(a, f"押す量 {a:+d}")
-        rows.append((lab, lambda az, a=a: Image.open(GEN / tag(cond) / fname("translucent", a, coef, az))))
+        rows.append((lab, lambda az, a=a: on_gray(Image.open(GEN / tag(cond) / fname("translucent", a, coef, az)))))
     fig, axes = plt.subplots(len(rows), len(AZ), figsize=(9.2, 14))
     for r, (label, get) in enumerate(rows):
         for c, az in enumerate(AZ):
@@ -362,7 +377,7 @@ def fig_steer_images(cond, coef):
                 ax.set_title(AZ_JA[az], fontsize=11)
             if c == 0:
                 ax.set_ylabel(label, fontsize=11)
-    fig.suptitle(f"{cond_ja(cond)}・{DENS[coef]}：埋め込みを押しても、裏側は金属のような見た目のまま", fontsize=12, y=1.0)
+    fig.suptitle(f"{cond_ja(cond)}・{DENS[coef]}：埋め込みを押しても、裏側は不透明な物体のような濃い陰影のまま", fontsize=12, y=1.0)
     fig.tight_layout()
     save(fig, "09_埋め込みを押したときの見た目.png")
 
@@ -370,12 +385,12 @@ def fig_steer_images(cond, coef):
 if __name__ == "__main__":
     fig_stimuli()
     fig_soaps()
-    fig_views(("stim01", "studio", 0), "016", "03a_正解と生成_順光.png")
-    fig_views(("stim01", "studio", 180), "016", "03b_正解と生成_逆光.png")
+    fig_views(("stim01", "studio", 0), "128", "03a_正解と生成_順光.png")
+    fig_views(("stim01", "studio", 180), "128", "03b_正解と生成_逆光.png")
     truth, opaque, gen, sd = far_stats()
     fig_far_stats(truth, gen, sd)
     fig_predict()
     fig_within()
     fig_readout()
     fig_steer_curves(truth)
-    fig_steer_images(("stim01", "studio", 0), "016")
+    fig_steer_images(("stim01", "studio", 0), "128")
