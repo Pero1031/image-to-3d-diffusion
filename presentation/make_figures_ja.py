@@ -28,14 +28,15 @@ FIG3, FIG_SOAP = ROOT / "image_to_3d" / "figures", ROOT / "soap" / "figures"
 PHOTOS = Path("D:/project/vision-experiments/material_aoi_pilot/images")
 MASKS = ROOT / "data" / "soap_masks" / "final"
 
-for f in ("BIZ-UDGothicR.ttc", "BIZ-UDGothicB.ttc"):
+for f in ("meiryo.ttc", "meiryob.ttc"):       # メイリオ: 画面・投影で読みやすく、数字の幅が詰まる（"0.4" が "0. 4" にならない）
     font_manager.fontManager.addfont(f"C:/Windows/Fonts/{f}")
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e5e4e0"
 TRUTH, MODEL, REF = "#2a78d6", "#eb6834", "#8a8984"     # 正解（半透明）、生成モデル、対照・画像統計量
 plt.rcParams.update({
-    "font.family": "BIZ UDGothic", "font.size": 11, "axes.unicode_minus": False,
+    "font.family": "Meiryo", "font.size": 13, "axes.unicode_minus": True,
     "axes.spines.top": False, "axes.spines.right": False, "axes.edgecolor": INK2, "axes.labelcolor": INK,
-    "xtick.color": INK2, "ytick.color": INK2, "text.color": INK, "axes.titlesize": 12,
+    "axes.linewidth": 1.0, "xtick.color": INK2, "ytick.color": INK2, "xtick.labelsize": 12, "ytick.labelsize": 12,
+    "text.color": INK, "axes.titlesize": 14, "axes.labelsize": 13,
     "savefig.dpi": 200, "savefig.bbox": "tight", "figure.facecolor": "white"})
 
 SHAPE = {"stim01": "形状A", "stim02": "形状B"}
@@ -150,7 +151,7 @@ def fig_soaps():
         for c, i in enumerate(idx):
             ax = axes[r, c]
             ax.imshow(soap_crop(names[i])); blank(ax)
-            ax.set_xlabel((f"組{c // 2 + 1}：" if r == 2 else "") + f"評定 {y[i]:+.2f}", fontsize=11)
+            ax.set_xlabel((f"組{c // 2 + 1}：" if r == 2 else "") + f"評定 {num(y[i])}", fontsize=11)
         axes[r, 0].set_title(title, loc="left", fontsize=12, pad=8)
     fig.suptitle("石けんの写真（61個 × 照明2条件 = 122枚）と半透明感の評定（6人、参加者ごとに標準化した平均）",
                  fontsize=12, y=1.0)
@@ -178,6 +179,43 @@ def fig_views(cond, coef, name):
     save(fig, name)
 
 
+# ------------------------------------------------------------------ グラフの共通部品
+# 発表用のグラフの決まり（Rougier et al. 2014 "Ten simple rules for better figures"、Wilke "Fundamentals of Data
+# Visualization" の 16・20・22 章による）:
+#   - 1枚の図で言うことは1つ。タイトルはその結論を書く。読み方の説明や数値の詳細は図の外の説明文に回す
+#   - 信頼区間などの誤差の表示は、主張がそれに頼るときだけ描く。描かない場合も説明文に数値を書く
+#   - 凡例より直接ラベル。縦書きの軸ラベルは避け、軸の左上に横書きで置く
+#   - 投影で読めるよう、文字・点・線を大きく太く。強調したい系列だけに色を使い、残りは灰色
+CAPTIONS = {}
+
+
+def caption(name, text):
+    CAPTIONS[name] = text
+
+
+def ytitle(ax, text):
+    """縦書きの軸ラベルの代わりに、軸の左上に横書きで置く。"""
+    ax.text(0, 1.02, text, transform=ax.transAxes, ha="left", va="bottom", fontsize=12, color=INK2)
+
+
+def grid(ax, axis="both"):
+    ax.grid(axis=axis, color=GRID, lw=0.8)
+    ax.set_axisbelow(True)
+
+
+def title(fig, text, sub=None):
+    """図の結論を1行で左上に。sub は読み方の補足（灰色の小さい字）。"""
+    h = fig.get_size_inches()[1]
+    fig.suptitle(text, x=0.01, y=1.0 if sub is None else 0.985 + 0.7 / h, ha="left", fontsize=16)
+    if sub:
+        fig.text(0.01, 0.985, sub, ha="left", va="bottom", fontsize=12, color=INK2)
+
+
+def num(v, digits=2):
+    """符号つきの数。マイナスは軸の目盛りと同じ記号（−）にそろえる。"""
+    return f"{v:+.{digits}f}".replace("-", "\u2212")
+
+
 # ------------------------------------------------------------------ 図 4: 裏側の輝度とコントラスト
 def far_stats():
     """条件ごとの、見えていない3視点の (平均輝度, コントラスト)。Zero-1-to-3 は乱数3回の平均と標準偏差。"""
@@ -190,183 +228,207 @@ def far_stats():
 
 
 def fig_far_stats(truth, gen, sd):
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.8))
-    for j, (ax, m) in enumerate(zip(axes, ("平均輝度", "コントラスト（標準偏差 / 平均）"))):
-        lim = max(truth[:, j].max(), (gen[:, j] + sd[:, j]).max()) * 1.1
-        ax.plot([0, lim], [0, lim], ls=":", color=INK2, lw=1)
-        ax.text(lim * 0.97, lim * 0.93, "正解と同じ", ha="right", va="top", fontsize=9, color=INK2, rotation=45,
-                rotation_mode="anchor")
-        ax.errorbar(truth[:, j], gen[:, j], yerr=sd[:, j], fmt="o", ms=7, color=MODEL, ecolor=MODEL, elinewidth=1,
-                    capsize=0, mec="white", mew=1)
-        ax.set_xlim(0, lim); ax.set_ylim(0, lim); ax.set_aspect("equal")
-        ax.set_xlabel(f"正解（半透明）の裏側の{m.split('（')[0]}")
-        ax.set_ylabel(f"Zero-1-to-3 の裏側の{m.split('（')[0]}")
-        ax.set_title(m, loc="left")
-        ax.grid(color=GRID, lw=0.6); ax.set_axisbelow(True)
-    n_dark = int((gen[:, 0] < truth[:, 0]).sum()); n_con = int((gen[:, 1] > truth[:, 1]).sum())
-    axes[0].text(0.03, 0.97, f"18条件中 {n_dark} 条件で\n正解より暗い", transform=axes[0].transAxes, va="top", fontsize=11)
-    axes[1].text(0.03, 0.97, f"18条件中 {n_con} 条件で\n正解よりコントラストが高い", transform=axes[1].transAxes, va="top",
-                 fontsize=11)
-    fig.suptitle("見えていない側（90・180・270度の平均）：生成は正解より暗く、陰影が強い\n"
-                 "点 = 1条件（乱数3回の平均）、縦線 = 乱数による標準偏差", fontsize=12, y=1.02)
+    name = "04_裏側の輝度とコントラスト.png"
+    fig, axes = plt.subplots(1, 2, figsize=(11, 5.8))
+    n_dark = int((gen[:, 0] < truth[:, 0]).sum())
+    n_con = int((gen[:, 1] > truth[:, 1]).sum())
+    panels = ((0, "平均輝度", (0.15, 0.65), "below", f"18条件中 {n_dark} 条件で\n生成のほうが暗い"),
+              (1, "コントラスト（標準偏差 ÷ 平均）", (0.2, 1.2), "above", f"18条件中 {n_con} 条件で\n生成のほうが陰影が強い"))
+    for ax, (j, head, (lo, hi), side, note) in zip(axes, panels):
+        # 主張の側（生成が暗い／陰影が強い）を薄く塗り、そこに数を書く
+        ax.fill_between([lo, hi], [lo, hi], lo if side == "below" else hi, color="#f3f2ef", lw=0)
+        ax.plot([lo, hi], [lo, hi], color=INK2, lw=1.2)
+        ax.scatter(truth[:, j], gen[:, j], s=80, color=MODEL, edgecolor="white", lw=1.5, zorder=3)
+        ax.set_xlim(lo, hi); ax.set_ylim(lo, hi); ax.set_aspect("equal")
+        w = hi - lo
+        if side == "below":
+            ax.text(hi - 0.03 * w, lo + 0.03 * w, note, ha="right", va="bottom", fontsize=13)
+        else:
+            ax.text(lo + 0.03 * w, hi - 0.03 * w, note, ha="left", va="top", fontsize=13)
+        ax.text(lo + 0.86 * w, lo + 0.86 * w, "正解と同じ", ha="center", va="top", fontsize=11, color=INK2,
+                rotation=45, rotation_mode="anchor", transform_rotates_text=True)
+        ax.set_title(head, loc="left", pad=28)
+        ax.set_xlabel("正解（半透明）の裏側")
+        ytitle(ax, "Zero-1-to-3 が描いた裏側")
+        grid(ax)
+    title(fig, "生成された裏側は、正解より暗く、陰影が強い")
     fig.tight_layout()
-    save(fig, "04_裏側の輝度とコントラスト.png")
+    save(fig, name)
+    gap = np.abs(gen - truth).mean(0)
+    caption(name, "点 = 1条件（形状2 × 照明と向き3 × 濁り3段階 = 18条件）。値は見えていない3視点（90・180・270度）の平均で、"
+                  "Zero-1-to-3 は乱数3回の平均。斜めの線より下は生成のほうが暗い、上は生成のほうがコントラストが高い。"
+                  f"乱数による標準偏差は平均で 輝度 {sd[:, 0].mean():.3f}・コントラスト {sd[:, 1].mean():.3f} で、"
+                  f"正解とのずれ（平均 {gap[0]:.3f}・{gap[1]:.3f}）より小さいので、図では省いた。")
 
 
 # ------------------------------------------------------------------ 図 5: 評定の予測
-def dot_rows(ax, rows, ceiling=None, chance=None, xlim=(0, 1)):
-    """rows: (ラベル, r, (下限, 上限), 色) を上から順に。"""
-    n = len(rows)
-    if chance is not None:
-        ax.axvspan(xlim[0], chance, color=GRID, lw=0)
-        ax.text(chance, n - 0.35, " 偶然でも\n 出る範囲", fontsize=9, color=INK2, va="top")
-    for k, (label, r, ci, color) in enumerate(rows):
-        yk = n - 1 - k
-        ax.plot(ci, [yk, yk], color=color, lw=2, solid_capstyle="round")
-        ax.plot(r, yk, "o", ms=9, color=color, mec="white", mew=1.5)
-        ax.text(ci[0] - 0.015, yk, f"{r:.2f}", va="center", ha="right", fontsize=11)
-    if ceiling is not None:
-        ax.axvline(ceiling, color=INK2, ls=":", lw=1)
-        ax.text(ceiling, n - 0.35, "評定者どうしの\n一致による上限 ", fontsize=9, color=INK2, ha="right", va="top")
-    ax.set_yticks(range(n)); ax.set_yticklabels([r[0] for r in rows][::-1])
-    ax.set_ylim(-0.6, n - 0.2); ax.set_xlim(*xlim)
-    ax.spines["left"].set_visible(False); ax.tick_params(axis="y", length=0)
-    ax.grid(axis="x", color=GRID, lw=0.6); ax.set_axisbelow(True)
-
-
 def fig_predict():
+    name = "05_評定の予測精度.png"
     s = json.load(open(FIG_SOAP / "predict_summary.json"))
     R = s["results"]
     unet = max((k for k in R if k.startswith("zero123_unet")), key=lambda k: R[k]["r"])
     rows = [("平均色", "color", REF), ("画像統計量 14種", "stats14", REF),
             ("Zero-1-to-3 の画像埋め込み（CLIP）", "zero123_clip_nobg", TRUTH),
             ("Zero-1-to-3 の U-Net 内部", unet, TRUTH), ("TripoSR の画像特徴（DINO）", "triposr_dino_bg", TRUTH)]
-    fig, ax = plt.subplots(figsize=(9, 4))
-    dot_rows(ax, [(lab, R[k]["r"], R[k]["ci"], c) for lab, k, c in rows], ceiling=float(np.sqrt(s["reliability"])),
-             chance=max(R[k]["null_95"] for _, k, _ in rows))
-    ax.set_xlabel("予測と評定の相関 r（石けんごとに学習から外して評価。線は95%信頼区間）")
-    ax.set_title("半透明感の評定を、モデルの特徴から線形に読み出せる（122枚、61個の石けん）", loc="left")
+    ceiling = float(np.sqrt(s["reliability"]))
+    fig, ax = plt.subplots(figsize=(10, 4.6))
+    ys = [5.4, 4.4, 2.6, 1.6, 0.6]                       # 画像統計量と生成モデルの間を少しあける
+    for yk, (lab, key, color) in zip(ys, rows):
+        r = R[key]["r"]
+        ax.barh(yk, r, height=0.6, color=color, lw=0)
+        ax.text(r + 0.012, yk, f"{r:.2f}", va="center", fontsize=14,
+                bbox=dict(boxstyle="square,pad=0.1", fc="white", ec="none"), zorder=4)
+    ax.axvline(ceiling, color=INK2, lw=1.2, ls=(0, (2, 2)), zorder=3)
+    ax.text(ceiling, 6.05, f"評定者どうしの一致から見た上限 {ceiling:.2f}", ha="right", va="bottom", fontsize=11, color=INK2)
+    ax.set_yticks(ys); ax.set_yticklabels([r[0] for r in rows], fontsize=13)
+    ax.set_ylim(0, 6.4); ax.set_xlim(0, 1.06); ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.spines["left"].set_visible(False); ax.tick_params(axis="y", length=0)
+    ax.set_xlabel("予測と評定の相関 r")
+    grid(ax, "x")
+    title(fig, "半透明感の評定は、生成モデルの特徴から高い精度で読み出せる")
     fig.tight_layout()
-    save(fig, "05_評定の予測精度.png")
+    save(fig, name)
+    ci = "、".join(f"{lab} [{R[k]['ci'][0]:.2f}, {R[k]['ci'][1]:.2f}]" for lab, k, _ in rows)
+    lo, hi = s["best_minus_stats_ci"]
+    caption(name, "石けん61個 × 照明2条件 = 122枚。評定は6人の平均（参加者ごとに標準化）。特徴から評定をリッジ回帰で予測し、"
+                  "石けん1個ずつ（同じ石けんの2枚は一緒に）学習から外して評価した。"
+                  f"95%信頼区間：{ci}。CLIP と画像統計量の差は {R['zero123_clip_nobg']['r'] - R['stats14']['r']:.2f}"
+                  f"（95%信頼区間 [{lo:.2f}, {hi:.2f}]）。評定をシャッフルしたときの r の95%点は "
+                  f"{min(R[k]['null_95'] for _, k, _ in rows):.2f}〜{max(R[k]['null_95'] for _, k, _ in rows):.2f}。")
 
 
 # ------------------------------------------------------------------ 図 6: 同じ石けんの2枚
 def fig_within():
+    name = "06_同じ石けんの2枚.png"
     data, names, groups, Z, y = load()
     ids = sorted(set(groups))
     P = np.array([[i for i in range(len(names)) if groups[i] == g] for g in ids])
     d = y[P[:, 0]] - y[P[:, 1]]
-    feats = {"stats14+color": np.concatenate([data["stats14"], data["color"]], 1).astype(np.float64),
-             "zero123_clip_nobg": data["zero123_clip_nobg"].astype(np.float64)}
+    large = np.abs(d) > np.median(np.abs(d))             # 評定の差が大きい組（within_pair.py と同じ分け方）
     s = json.load(open(FIG_SOAP / "within_pair_summary.json"))
     R = s["results"]
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), gridspec_kw={"width_ratios": [1, 1.25]})
-    ax = axes[0]
-    sgn = np.sign(d)
-    for k, color, lab in (("stats14+color", REF, "画像統計量 + 色"), ("zero123_clip_nobg", TRUTH, "CLIP の読み出し")):
+    feats = {"stats14+color": np.concatenate([data["stats14"], data["color"]], 1).astype(np.float64),
+             "zero123_clip_nobg": data["zero123_clip_nobg"].astype(np.float64)}
+    fig, axes = plt.subplots(1, 2, figsize=(11, 5.6), sharey=True)
+    sgn = np.sign(d)                                    # 評定が高いほうの写真を先にそろえる（右側 = 向きが合う）
+    lim, top = 1.45, 1.42
+    for ax, (k, color, lab) in zip(axes, (("stats14+color", REF, "画像統計量 + 色"), ("zero123_clip_nobg", TRUTH, "CLIP の読み出し"))):
         pred = cv_predict(feats[k], y, groups)
         p = (pred[P[:, 0]] - pred[P[:, 1]]) * sgn
-        ax.scatter(p, d * sgn, s=28, color=color, edgecolor="white", lw=0.6,
-                   label=f"{lab}（r = {R[k]['method1']['r']:.2f}）")
-    lim = 1.45
-    ax.axvline(0, color=INK2, lw=0.8)
-    ax.text(lim * 0.97, 0.03, "向きが合う →", ha="right", fontsize=9, color=INK2)
-    ax.text(-lim * 0.97, 0.03, "← 逆向き", ha="left", fontsize=9, color=INK2)
-    ax.set_xlim(-lim, lim); ax.set_ylim(0, 1.4)
-    ax.set_xlabel("予測された差（評定が高いほうの写真 − もう一方）"); ax.set_ylabel("評定の差")
-    ax.legend(loc="upper left", fontsize=10, frameon=True, framealpha=1, edgecolor="white")
-    ax.set_title("1点 = 1個の石けん（照明だけが違う2枚）", loc="left", fontsize=11)
-    ax.grid(color=GRID, lw=0.6); ax.set_axisbelow(True)
-    unet = "zero123_unet_t900_nobg"
-    rows = [("画像統計量 + 色", "stats14+color", REF), ("Zero-1-to-3 の画像埋め込み（CLIP）", "zero123_clip_nobg", TRUTH),
-            ("Zero-1-to-3 の U-Net 内部", unet, TRUTH), ("TripoSR の画像特徴（DINO）", "triposr_dino_bg", TRUTH)]
-    dot_rows(axes[1], [(lab, R[k]["method1"]["r"], R[k]["method1"]["ci"], c) for lab, k, c in rows],
-             ceiling=s["ceiling_r"], xlim=(-0.3, 1))
-    axes[1].axvline(0, color=INK2, lw=0.8)
-    axes[1].set_xlabel("評定の差との相関 r（石けんの種類の違いは使えない。線は95%信頼区間）")
-    axes[1].set_title("石けんの間で学習した読み出しを、同じ石けんの2枚に当てる", loc="left", fontsize=11)
-    fig.suptitle("「石けんの種類を見分けているだけ」ではない：同じ石けんの照明による違いも追える", fontsize=13, y=1.02)
+        a = np.abs(d)
+        ax.axhspan(0, np.median(a), color="#f3f2ef", lw=0)
+        ax.axvline(0, color=INK2, lw=1.2)
+        ax.scatter(p[large], a[large], s=70, color=color, edgecolor="white", lw=1.2, zorder=3)
+        ax.scatter(p[~large], a[~large], s=40, color=color, alpha=0.35, lw=0, zorder=3)
+        n_ok = int((p[large] > 0).sum())
+        ax.set_title(f"{lab}：{large.sum()}組中 {n_ok}組で向きが合う", loc="left", pad=28)
+        ax.text(lim * 0.96, top * 0.97, "向きが合う →", ha="right", va="top", fontsize=12, color=INK2)
+        ax.text(-lim * 0.96, top * 0.97, "← 逆向き", ha="left", va="top", fontsize=12, color=INK2)
+        ax.set_xlim(-lim, lim); ax.set_ylim(0, top)
+        ax.set_xlabel("予測された差（評定が高いほうの写真 − もう一方）")
+        grid(ax)
+    ytitle(axes[0], "評定の差")
+    title(fig, "照明だけが違う同じ石けんの2枚の差も、CLIP の読み出しは追える",
+          f"濃い点：評定の差が大きい組（{large.sum()}組）　薄い点と灰色の帯：差が小さく、評定者の間でも向きがそろわない組（{(~large).sum()}組）")
     fig.tight_layout()
-    save(fig, "06_同じ石けんの2枚.png")
+    save(fig, name)
+    m = {k: R[k]["method1"] for k in ("stats14+color", "zero123_clip_nobg", "zero123_unet_t900_nobg", "triposr_dino_bg")}
+    caption(name, f"点 = 1個の石けん（照明だけが違う2枚、{len(P)}組）。読み出しは石けんの間で学習したもの（その石けんは学習から外す）を"
+                  "そのまま2枚に当てた。濃い点は評定の差が中央値より大きい組（評定者を3人ずつに分けると、9割の組で向きがそろう）、"
+                  f"薄い点と灰色の帯は差が小さい組。原点まわりの相関 r：画像統計量 + 色 {m['stats14+color']['r']:.2f}"
+                  f" [{m['stats14+color']['ci'][0]:.2f}, {m['stats14+color']['ci'][1]:.2f}]、"
+                  f"CLIP {m['zero123_clip_nobg']['r']:.2f} [{m['zero123_clip_nobg']['ci'][0]:.2f}, {m['zero123_clip_nobg']['ci'][1]:.2f}]"
+                  f"（95%信頼区間）。ほかのモデルでも同様：U-Net 内部 r = {m['zero123_unet_t900_nobg']['r']:.2f}"
+                  f"（{m['zero123_unet_t900_nobg']['same_sign_large']}組）、DINO r = {m['triposr_dino_bg']['r']:.2f}"
+                  f"（{m['triposr_dino_bg']['same_sign_large']}組）。評定者どうしの一致から見た上限 r = {s['ceiling_r']:.2f}。")
 
 
 # ------------------------------------------------------------------ 図 7: 読み出しで測った裏側
 def fig_readout():
+    name = "07_読み出しで測った裏側.png"
     sc = {k: np.array(v) for k, v in json.load(open(FIG3 / "readout_summary.json"))["clip"]["scores"].items()}
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), gridspec_kw={"width_ratios": [1, 1.1]})
-    ax = axes[0]
-    items = [("入力画像\n（正面・正解）", "input_translucent", TRUTH), ("正解の裏側\n（半透明）", "far_translucent", TRUTH),
-             ("不透明の対照\nの裏側", "far_opaque", REF), ("Zero-1-to-3\n0度（正面）", "zero123_az0", MODEL),
-             ("Zero-1-to-3\nの裏側", "zero123_far", MODEL)]
-    for k, (lab, key, color) in enumerate(items):
-        v = sc[key]
-        ax.scatter(np.full(len(v), k) + np.linspace(-0.18, 0.18, len(v)), v, s=12, color=color, alpha=0.35, lw=0)
-        se = v.std(ddof=1) / np.sqrt(len(v))
-        ax.errorbar(k, v.mean(), yerr=1.96 * se, fmt="o", ms=10, color=color, mec="white", mew=1.5, elinewidth=2,
-                    capsize=0)
-        ax.text(k + 0.25, v.mean(), f"{v.mean():+.2f}", va="center", fontsize=10)
-    ax.set_xticks(range(len(items))); ax.set_xticklabels([i[0] for i in items], fontsize=10)
-    ax.set_ylabel("読み出し値（半透明感の推定。石けんの評定の単位）")
-    ax.set_title("平均（大きい点、95%信頼区間）と各条件（小さい点）", loc="left", fontsize=11)
-    ax.grid(axis="y", color=GRID, lw=0.6); ax.set_axisbelow(True)
-    ax = axes[1]
     x = sc["input_translucent"]
-    lo, hi = -0.75, 0.6
-    ax.plot([lo, hi], [lo, hi], ls=":", color=INK2, lw=1)
-    ax.text(hi * 0.97, hi * 0.9, "正面と同じ", ha="right", fontsize=9, color=INK2)
-    for key, color, lab, mk in (("far_translucent", TRUTH, "正解の裏側（半透明）", "o"),
-                                ("far_opaque", REF, "不透明の対照の裏側", "s"),
-                                ("zero123_far", MODEL, "Zero-1-to-3 の裏側", "^")):
-        ax.scatter(x, sc[key], s=46, color=color, marker=mk, edgecolor="white", lw=0.8, label=lab)
-    ax.set_xlim(lo, hi); ax.set_ylim(lo, hi); ax.set_aspect("equal")
-    ax.set_xlabel("入力画像（正面）の読み出し値"); ax.set_ylabel("裏側の読み出し値")
-    ax.legend(loc="upper left", fontsize=10, frameon=False)
-    ax.set_title("1点 = 1条件", loc="left", fontsize=11)
-    ax.grid(color=GRID, lw=0.6); ax.set_axisbelow(True)
-    fig.suptitle("石けんで学習した読み出しを「半透明感の物差し」として当てる：\n"
-                 "本物は裏側のほうが半透明寄りの値になるが、Zero-1-to-3 は正面の値を裏側にそのまま写している", fontsize=12, y=1.04)
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5.8), sharey=True)
+    for ax, key, color, lab in ((axes[0], "far_translucent", TRUTH, "正解（本物の半透明物体）"),
+                                (axes[1], "zero123_far", MODEL, "Zero-1-to-3 の生成")):
+        v = sc[key]
+        for a, b in zip(x, v):                           # 細い線 = 1条件、太い線 = 18条件の平均
+            ax.plot([0, 1], [a, b], color=color, alpha=0.3, lw=1.2, solid_capstyle="round")
+        ax.plot([0, 1], [x.mean(), v.mean()], "-o", color=color, lw=4, ms=11, mec="white", mew=1.8, zorder=3)
+        ax.text(-0.08, x.mean(), num(x.mean()), ha="right", va="center", fontsize=14)
+        ax.text(1.08, v.mean(), num(v.mean()), ha="left", va="center", fontsize=14)
+        ax.set_xticks([0, 1]); ax.set_xticklabels(["正面\n（入力画像）", "裏側\n（見えていない側）"], fontsize=13)
+        ax.set_xlim(-0.45, 1.45)
+        ax.set_title(f"{lab}\n18条件中 {int((v > x).sum())} で裏側が上がる（平均 {num(v.mean() - x.mean())}）", loc="left",
+                     pad=28, fontsize=13)
+        ax.tick_params(axis="x", length=0)
+        grid(ax, "y")
+    ytitle(axes[0], "読み出し値（上ほど半透明寄り）")
+    title(fig, "半透明感の物差しで測ると、本物は裏側で半透明寄りになるが、生成はほぼ正面のまま")
     fig.tight_layout()
-    save(fig, "07_読み出しで測った裏側.png")
+    save(fig, name)
+    r = json.load(open(FIG3 / "readout_summary.json"))["clip"]["far_vs_input"]
+    caption(name, "物差し = 石けんの写真で学習した、CLIP 埋め込みから評定を出す線形の読み出し（値は石けんの評定の単位）。"
+                  "正面は入力画像（両方のパネルで同じ）、裏側は見えていない3視点（90・180・270度）の平均。"
+                  f"不透明の対照の裏側は平均 {sc['far_opaque'].mean():+.2f} で、物差しは不透明な物体を低く測る。"
+                  f"Zero-1-to-3 の裏側は正解の裏側より入力画像と強く相関する（偏相関 {r['partial_zero123_input_given_truth']:.2f} 対 "
+                  f"{r['partial_zero123_truth_given_input']:.2f}）。")
 
 
 # ------------------------------------------------------------------ 図 8: 埋め込みを押す実験
 def fig_steer_curves(truth_far):
+    name = "08_埋め込みを押す実験.png"
     s = json.load(open(FIG3 / "steer_summary.json"))
     b = s["by_alpha"]
-    sc = {k: np.array(v) for k, v in json.load(open(FIG3 / "readout_summary.json"))["clip"]["scores"].items()}
-    sd = {k: np.array(v) for k, v in json.load(open(FIG3 / "readout_summary.json"))["dino"]["scores"].items()}
+    rs = json.load(open(FIG3 / "readout_summary.json"))
     refs = {"luminance": truth_far[:, 0].mean(), "contrast": truth_far[:, 1].mean(),
-            "clip_readout": sc["far_translucent"].mean(), "dino_readout": sd["far_translucent"].mean()}
+            "clip_readout": np.mean(rs["clip"]["scores"]["far_translucent"]),
+            "dino_readout": np.mean(rs["dino"]["scores"]["far_translucent"])}
     M = (("luminance", "平均輝度"), ("contrast", "コントラスト"), ("clip_readout", "読み出し（CLIP）"),
          ("dino_readout", "読み出し（DINO）"))
-    fig, axes = plt.subplots(1, 4, figsize=(15, 4.4))
     steps = (-2, -1, 0, 1, 2)
+
+    def pct(m, v):          # 元の生成（押す量 0）から正解の裏側までの差を 100% とした位置。指標ごとの単位の違いを消す
+        base = b["translucent_+0"]["far"][m]
+        return 100 * (v - base) / (refs[m] - base)
+
+    fig, axes = plt.subplots(1, 4, figsize=(13, 4.9), sharey=True)
     for ax, (m, lab) in zip(axes, M):
-        for k, c in enumerate(("control1", "control2")):
-            ax.plot([-2, 2], [b[f"{c}_{a:+d}"]["far"][m] for a in (-2, 2)], "-s", color=REF, lw=1.5, ms=6,
-                    label="対照の方向（同じ長さ、ランダム）" if k == 0 else None)
-        ax.plot(steps, [b[f"translucent_{a:+d}"]["far"][m] for a in steps], "-o", color=MODEL, lw=2.2, ms=8,
-                mec="white", mew=1.2, label="「半透明」の方向")
-        ax.axhline(refs[m], color=TRUTH, ls="--", lw=1.5, label="正解（半透明）の裏側")
-        ax.set_title(lab, loc="left")
-        ax.set_xticks(steps); ax.set_xlabel("押した量（評定の単位）")
-        ax.grid(color=GRID, lw=0.6); ax.set_axisbelow(True)
-    axes[0].legend(loc="center left", fontsize=9, frameon=False, bbox_to_anchor=(0, 0.62))
+        ax.axhline(100, color=TRUTH, lw=2.2)
+        ax.axhline(0, color=INK2, lw=1)
+        for c in ("control1", "control2"):
+            ax.plot([-2, 0, 2], [pct(m, b[f"{c}_-2"]["far"][m]), 0, pct(m, b[f"{c}_+2"]["far"][m])], "-s",
+                    color=REF, lw=2, ms=7, mec="white", mew=1)
+        v = [pct(m, b[f"translucent_{a:+d}"]["far"][m]) for a in steps]
+        ax.plot(steps, v, "-o", color=MODEL, lw=3, ms=9, mec="white", mew=1.5, zorder=3)
+        ax.text(2, v[-1] + 7, f"{num(v[-1], 0)}%", ha="center", va="bottom", fontsize=14, zorder=4)
+        ax.set_title(lab, loc="left", pad=28)
+        ax.set_xticks(steps); ax.set_xticklabels(["−2", "−1", "0", "+1", "+2"])
+        ax.set_xlim(-2.4, 2.4); ax.set_ylim(-60, 112)
+        ax.set_yticks([0, 50, 100]); ax.set_yticklabels(["元の生成 0%", "50%", "正解の裏側 100%"])
+        ax.set_xlabel("押した量")
+        grid(ax)
+    ytitle(axes[0], "正解までの差のうち、埋まった割合")
+    handles = [plt.Line2D([], [], color=MODEL, lw=3, marker="o", ms=9, mec="white", label="「半透明」の方向に押す"),
+               plt.Line2D([], [], color=REF, lw=2, marker="s", ms=7, mec="white", label="対照：同じ長さのランダムな方向（2本）")]
+    fig.legend(handles=handles, loc="upper left", ncol=2, frameon=False, fontsize=12, bbox_to_anchor=(0.0, 0.93))
+    plus2 = [pct(m, b["translucent_+2"]["far"][m]) for m, _ in M]
+    title(fig, f"埋め込みを「半透明」の方向に押しても、生成された裏側は正解まで {min(plus2):.0f}〜{max(plus2):.0f}% しか近づかない")
+    fig.tight_layout(rect=(0, 0, 1, 0.86))
+    save(fig, name)
     tr = s["transmission"]
-    fig.text(0.5, -0.06, f"押した量のうち出力に届いたのは約 {tr['translucent_far']['mean'] * 100:.0f}%"
-             f"（対照の方向でも {tr['control1_far']['mean'] * 100:.0f}%・{tr['control2_far']['mean'] * 100:.0f}%）。"
-             "向きは半透明側にそろう（18条件中 16〜17）が、変化は小さい", ha="center", fontsize=12)
-    fig.suptitle("Zero-1-to-3 の画像埋め込みを「半透明」の方向に押したときの、生成された裏側（18条件の平均）\n"
-                 "押す幅 −2〜+2 は、石けん122枚が埋め込み上で広がる範囲の端から端に相当", fontsize=12, y=1.06)
-    fig.tight_layout()
-    save(fig, "08_埋め込みを押す実験.png")
+    caption(name, "Zero-1-to-3 の画像埋め込み（CLIP）に「半透明」の方向（石けんの評定に沿って埋め込みが変わる向き）を足して生成し直した。"
+                  "押す量 ±2 は、石けん122枚が埋め込み上で広がる範囲の端から端に当たる。値は18条件の平均（乱数は固定）で、"
+                  "元の生成から正解の裏側までの差を100%として表した。向きは18条件中16〜17で半透明側にそろうが、"
+                  f"押した分のうち出力の埋め込みに届いたのは約 {tr['translucent_far']['mean'] * 100:.0f}%"
+                  f"（ランダムな方向でも {tr['control1_far']['mean'] * 100:.0f}%・{tr['control2_far']['mean'] * 100:.0f}%）。")
 
 
 def fig_steer_images(cond, coef):
     from steer_embedding import fname
     rows = [("正解（半透明）", lambda az: gt_image(cond, coef, az, bg=SHOW_BG)[0])]
     for a in (-2, -1, 0, 1, 2):
-        lab = {-2: "押す量 −2（不透明側）", 0: "押す量 0（元の生成）", 2: "押す量 +2（半透明側）"}.get(a, f"押す量 {a:+d}")
+        lab = {-2: "押す量 −2（不透明側）", 0: "押す量 0（元の生成）", 2: "押す量 +2（半透明側）"}.get(a, f"押す量 {num(a, 0)}")
         rows.append((lab, lambda az, a=a: on_gray(Image.open(GEN / tag(cond) / fname("translucent", a, coef, az)))))
     fig, axes = plt.subplots(len(rows), len(AZ), figsize=(9.2, 14))
     for r, (label, get) in enumerate(rows):
@@ -394,3 +456,7 @@ if __name__ == "__main__":
     fig_readout()
     fig_steer_curves(truth)
     fig_steer_images(("stim01", "studio", 0), "128")
+    with open(OUT / "00_図の説明.txt", "w", encoding="utf-8") as f:     # 図の外に置く説明文（発表のメモやスライドの注に使う）
+        for k, v in CAPTIONS.items():
+            f.write(f"{k}\n{v}\n\n")
+    print("wrote 00_図の説明.txt")
