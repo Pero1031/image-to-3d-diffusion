@@ -258,6 +258,34 @@ nothing about what training for 3D added. The U-Net receives the image itself, s
 expected. Soaps come in types (clear glycerine bars, milky bars), and a feature that recognises the type would
 also predict the rating; held-out soaps rule out memorising an object, not this. Decodable does not mean used.
 
+## Related work and what is still open
+
+From a short literature search (summaries of the papers, except TRELLIS.2, which was read in full):
+
+- Recent image-to-3D models output albedo, roughness and metallic maps (for example Hunyuan3D 2.1). There is
+  no channel for light that passes through the object, so translucency has nowhere to go even if it is detected.
+- TRELLIS.2 (Xiang et al., 2025) adds a per-voxel opacity and states that it can handle translucent surfaces.
+  The paper defines opacity only as a value in [0, 1], models no scattering, transmission or refraction, gives
+  no evaluation specific to translucent objects, and lists no limitation about materials. It needs far more
+  GPU memory than was available here, so it was not run.
+- Subsurface scattering is handled on the reconstruction side, from many views of one object (SSS-3DGS, GTSR).
+  DIAMOND-SSS fine-tunes view-synthesis and relighting diffusion models on translucent captures, which suggests
+  that the missing ingredient is training data rather than architecture.
+- Marlow, Kim & Anderson (2017) argue that perceived opacity depends on how intensity covaries with surface
+  orientation, computed where 3D shape is explicit. A model that maps image to image without an explicit shape
+  or light has no place to do this for the unseen side.
+
+No study was found that measures what a single-image 3D model puts on the far side of a translucent object
+against a physically based reference, or that relates it to human judgements. The search was not exhaustive.
+
+## What did not work
+
+A multi-view set of a wax statue and an opaque copy (rendered earlier with another renderer) looked ideal: same
+shape and light, true novel views already available. Zero-1-to-3 did not produce coherent side views of the
+tall, thin statue (duplicated or fragmented figures at 90 and 270 degrees, with either material), and the
+higher-resolution wax images were not denoised. The scripts are kept (`image_to_3d/statue.py`); no result
+from this set is reported.
+
 ## Setup
 
 ```
