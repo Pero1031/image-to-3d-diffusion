@@ -108,15 +108,22 @@ class Encoders:
                                        weight_name="model.ckpt").to(device).eval()
 
     @torch.no_grad()
-    def __call__(self, im):
-        """im: 物体が 85% を占める白背景の PIL。soap/features.py と同じ手順で (CLIP, DINO) を返す。"""
+    def tokens(self, im):
+        """soap/features.py と同じ手順で (CLIP の埋め込み (768,), CLIP の最終層のトークン (1 + 16x16, 1024),
+        DINO のトークン (1 + 32x32, 768)) を返す。どちらも先頭が CLS、残りが左上から行ごとのパッチ。"""
         x = torch.from_numpy(np.asarray(im.convert("RGB").resize((256, 256), Image.LANCZOS))).float()
         x = x.div(127.5).sub(1).permute(2, 0, 1)[None].to(device)
         c = F.interpolate(x * 0.5 + 0.5, size=224, mode="bicubic", antialias=True)
-        clip = self.clip((c - self.mean) / self.std).image_embeds[0].float().cpu().numpy()
+        out = self.clip((c - self.mean) / self.std)
         x = torch.from_numpy(np.asarray(im.convert("RGB").resize((512, 512), Image.LANCZOS))).float().div(255)
-        dino = self.tsr.image_tokenizer(x.permute(2, 0, 1)[None, None].to(device))[0, 0].mean(-1).float().cpu().numpy()
-        return clip, dino
+        dino = self.tsr.image_tokenizer(x.permute(2, 0, 1)[None, None].to(device))[0, 0].T   # (トークン, C)
+        return (out.image_embeds[0].float().cpu().numpy(), out.last_hidden_state[0].float().cpu().numpy(),
+                dino.float().cpu().numpy())
+
+    def __call__(self, im):
+        """im: 物体が 85% を占める白背景の PIL。(CLIP の埋め込み, DINO のトークンの平均) を返す。"""
+        clip, _, dino = self.tokens(im)
+        return clip, dino.mean(0)
 
 
 # ---------------------------------------------------------------- 計測

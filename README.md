@@ -34,7 +34,8 @@ changes a little, and the change follows the front view of the input rather than
 models' image encoders predict human translucency ratings of real photographs well, including the difference
 between two photos of the same soap (Part 3). Used as a translucency measure, that readout finds that
 Zero-1-to-3 gives the far side the same value as the input view, while the real far side scores as more
-translucent than its front. Details and limits are below.
+translucent than its front. Observers' fixations go to the bright parts of the object, not to where the
+readout finds translucency. Details and limits are below.
 
 ![Front-lit studio, low density](image_to_3d/figures/views_stim01_studio_rot000_coef016.png)
 
@@ -214,6 +215,7 @@ on a rated gloss dataset) were applied to the same images.
 | `soap/segment.py`, `soap/finalize.py` | Object regions for the soap photographs |
 | `soap/features.py`, `soap/predict.py` | Model features and image statistics; prediction of the ratings |
 | `soap/ratings.py`, `soap/within_pair.py` | Rating loader and cross-validation; the test on two photos of the same soap |
+| `soap/patch_features.py`, `soap/gaze_model.py` | Patch features of the photos; gaze against the model features |
 | `image_to_3d/translucency_readout.py` | The soap-trained readout applied to the Part 2 images |
 
 Peak GPU memory: 6.5 GB for Zero-1-to-3 (4 views with guidance), 2.2 GB for TripoSR.
@@ -354,6 +356,63 @@ it, unchanged, to the hidden side. It misses the increase that the real object s
 Because the output is conditioned on this embedding, staying close to the input in CLIP space is expected for
 any property, not only translucency; the DINO measure, which the model never sees, shows the same pattern.
 
+### Where observers look
+
+The ratings were collected with eye tracking. 97% of fixations fall on the object, which is why earlier summaries
+of how widely people look (entropy, dispersion, share inside the outline) showed no relation to the ratings. Here
+the question is where on the object people look, compared with where the model features carry the information.
+
+- **Observers.** One observer (P003) fixated the centre of the object far more than the others: 81% of fixations
+  within a quarter of the object size from its centroid, against 30 to 58%. P003 is left out, leaving 5
+  observers and a median of 36 fixations per photo. The rating target is unchanged (all 6 observers).
+- **Features.** Patch tokens of the photos as shown: TripoSR's DINO (32 x 32) and the last layer of Zero-1-to-3's
+  CLIP (16 x 16).
+- **Controls.** A "typical gaze layout" maps other soaps' fixations onto this object's bounding box, with the
+  same number of fixations as the photo has. It keeps what all photos share (looking near the centre, for
+  example) and drops what is specific to the photo. The questions and decisions were written into the script
+  before it was run.
+
+**(a) Does pooling by gaze predict the ratings better?** The patches inside the object are averaged with
+different weights, and ratings are predicted as in the table above.
+
+| Weights | DINO patches | CLIP patches |
+|---|---|---|
+| Uniform over the object | 0.90 | 0.92 |
+| Gaze density of that photo | 0.87 | 0.91 |
+| Typical gaze layout, 20 draws (median, range) | 0.85 (0.83 to 0.88) | 0.91 (0.90 to 0.92) |
+| Where observers did not look | 0.90 | 0.92 |
+
+- Gaze adds nothing beyond the typical layout: 95% CI of the difference -0.01 to +0.04 (DINO) and -0.01 to
+  +0.01 (CLIP). Gaze is below uniform pooling for DINO (-0.03, CI -0.05 to -0.01): concentrating the weights
+  only discards patches. The parts nobody looked at carry as much as the whole object.
+- Averaging DINO patches inside the object gives 0.90, above the 0.86 of the first table, which averaged all
+  tokens including the background.
+
+**(b) Do observers look where the readout is high?** The uniform readout (soap held out) is applied to each patch,
+which splits the photo's prediction into a map. The measure is the map value at fixations, standardised within
+the object, minus the value the typical layout would give.
+
+| Map | DINO | CLIP | Photos above the typical layout (DINO / CLIP) |
+|---|---|---|---|
+| Luminance | +0.26 (0.21 to 0.31) | +0.25 (0.20 to 0.30) | 101 / 96 of 122 |
+| Readout | +0.04 (-0.01 to +0.09) | +0.05 (+0.01 to +0.09) | 71 / 73 |
+| Readout with luminance regressed out | +0.01 (-0.04 to +0.06) | +0.04 (+0.01 to +0.08) | 63 / 67 |
+
+![gaze examples](soap/figures/gaze_examples.png)
+
+*Top: the two highest- and two lowest-rated photos with the fixations of 5 observers. Bottom: the DINO readout
+per patch on one colour scale. The translucency signal covers the whole object; fixations do not pick out
+particular patches.*
+
+- **Observers look at the bright parts of the object**, a quarter of a standard deviation above the typical
+  layout, in about 4 of 5 photos. How strongly they do so is unrelated to the rating (r = -0.01).
+- **They hardly look where the readout is high.** The effect is a fifth of the luminance effect, absent for DINO,
+  and only just above zero for CLIP among 6 comparisons. The readout maps are not luminance maps (correlation
+  within the object 0.09 for DINO, 0.03 for CLIP).
+- So, in this task, gaze follows brightness. The translucency information that the models read out is spread
+  over the object, not concentrated where people look. Where people look does not change with translucency,
+  which fits the earlier null results.
+
 ### Limits of Part 3
 
 - 61 objects and 6 observers. The embedding is a general-purpose image encoder used as is, so this says nothing
@@ -364,6 +423,8 @@ any property, not only translucency; the DINO measure, which the model never see
 - The readout is trained on photographs of soap and applied to renders of blobs with a glass surface. The
   front-view check passes in only 13 of 18 cells with CLIP. Readout values are not ratings of these images:
   whether observers see the generated far side as less translucent than the true one is still unmeasured.
+- Gaze: 5 observers and about 36 fixations per photo, recorded during a rating task. The order and timing of
+  fixations are not used, and the 30-pixel smoothing is close to one DINO patch.
 - Decodable does not mean used.
 
 ## Related work and what is still open
