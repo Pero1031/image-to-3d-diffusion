@@ -72,6 +72,21 @@ def gen_image(cond, name):
     return im, object_mask(im)
 
 
+def fill_frame(im, ratio=0.85):
+    """表示用。物体が枠の ratio を占めるように置き直す（TripoSR の描画は物体が小さいので）。"""
+    from scipy import ndimage
+    a = np.asarray(im.convert("RGB")).copy()
+    m = object_mask(im)
+    a[~ndimage.binary_dilation(m, iterations=5)] = 255      # 真っ白でない背景を白にそろえる
+    ys, xs = np.where(m)
+    y0, y1, x0, x1 = max(ys.min() - 3, 0), ys.max() + 4, max(xs.min() - 3, 0), xs.max() + 4
+    side = int(max(y1 - y0, x1 - x0) / ratio)
+    canvas = np.full((side, side, 3), 255, np.uint8)
+    oy, ox = (side - (y1 - y0)) // 2, (side - (x1 - x0)) // 2
+    canvas[oy:oy + y1 - y0, ox:ox + x1 - x0] = a[y0:y1, x0:x1]
+    return Image.fromarray(canvas).resize((256, 256), Image.LANCZOS)
+
+
 # ------------------------------------------------------------------ 図 1: Part 2 の刺激
 def fig_stimuli():
     fig, axes = plt.subplots(len(CONDS), len(COEFS), figsize=(6.2, 12))
@@ -133,7 +148,7 @@ def fig_views(cond, coef, name):
     rows = (("正解（半透明）", lambda az: gt_image(cond, coef, az)[0]),
             ("不透明の対照", lambda az: gt_image(cond, coef, az, opaque=True)[0]),
             ("Zero-1-to-3 の生成", lambda az: gen_image(cond, f"zero123_coef{coef}_az{az:03d}_seed0.png")[0]),
-            ("TripoSR の生成", lambda az: gen_image(cond, f"triposr_coef{coef}_az{az:03d}.png")[0]))
+            ("TripoSR の生成", lambda az: fill_frame(gen_image(cond, f"triposr_coef{coef}_az{az:03d}.png")[0])))
     fig, axes = plt.subplots(len(rows), len(AZ), figsize=(9.6, 10.2))
     for r, (label, get) in enumerate(rows):
         for c, az in enumerate(AZ):
