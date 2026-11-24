@@ -22,7 +22,8 @@ models' features carry human judgements of translucency. Everything ran on a Qua
   translucency ratings of soap photos (r = 0.93), including the difference between two photos of the same soap
   (r = 0.60), where image statistics fail.
 - **Used as a measure, the readout shows the copying.** The real object reads as more translucent from the far
-  side than from the front; Zero-1-to-3's far side keeps the value of the front.
+  side than from the front; Zero-1-to-3's far side keeps the value of the front. On the rendered inputs, the
+  readout falls with scattering density under every lighting, which no single image statistic does.
 - **Pushing the embedding barely reaches the image.** Zero-1-to-3's CLIP embedding is moved along the
   translucency direction across the whole soap range. The far side gets slightly brighter and softer (17 of 18
   cells), but only about 2% of the push reaches the output, as for random directions. The images stay metal-like.
@@ -217,6 +218,30 @@ the diagonal the far side scores the same as the front.*
 - Because Zero-1-to-3 is conditioned on the CLIP embedding, staying close to the input in CLIP space is partly
   expected for any property.
 
+### Does the readout follow density?
+
+A check that the soap-trained readout measures material in the rendered stimuli, not only in soap photos. It is
+applied to the 41 input images. Within each of the 6 cells, the images differ only in scattering density: 6 steps
+from 16 to 512 for shape A, 11 for shape B. Expected before running: the higher the density, the lower the
+readout.
+
+| | CLIP readout | DINO readout | Mean luminance | Contrast |
+|---|---|---|---|---|
+| Rank correlation with density, range over the 6 cells | -0.77 to -1.00 | -0.09 to -1.00 | -1.00 to +1.00 | -0.55 to +0.60 |
+| Share of variance from density (shape A, 5 cells) | 0.72 | 0.39 | 0.01 | 0.28 |
+| Share of variance from the lighting cell | 0.04 | 0.26 | 0.17 | 0.42 |
+
+![density](image_to_3d/figures/readout_density.png)
+
+- **The CLIP readout falls with density in all 6 cells.** It is in perfect rank order in 4 of them, and 30 of
+  the 35 steps go down. Averaged over shape A, it drops from +0.31 at density 16 to -0.29 at 512, about two
+  thirds of the SD of the soap ratings.
+- **No single image statistic does this.** Mean luminance rises with density under front light and falls under
+  back light, so its correlation with density flips sign with the lighting.
+- **The lighting barely moves the readout** (4% of the variance), but density matters less under back light: the
+  range is about 0.3 there, against 0.6 to 1.2 under front light. Observers also see back-lit objects as more
+  translucent. Whether they show the same interaction needs a human experiment.
+
 ### Pushing the embedding toward translucency
 
 If the CLIP embedding carries translucency, does Zero-1-to-3 use it? The embedding is moved along the
@@ -282,8 +307,8 @@ per patch on one colour scale. The signal covers the whole object.*
 
 - 61 soaps and 6 observers (5 for gaze). The within-soap result rests on about 30 pairs.
 - The encoders are general-purpose and used as is, so this says nothing about what training for 3D added.
-- The readout is trained on soap photos and applied to rendered blobs. Whether observers see the generated far
-  side as less translucent has not been measured.
+- The readout is trained on soap photos and applied to rendered blobs. It orders the rendered inputs by density,
+  but whether observers see the generated far side as less translucent has not been measured.
 - The steering test used one model, one seed and two control directions.
 
 ## Related work
@@ -315,6 +340,7 @@ reported.
 | `image_to_3d/run_zero123.py`, `run_triposr.py` | Zero-1-to-3 sampling on the pretrained weights; TripoSR inference and rendering |
 | `image_to_3d/analyze_all.py`, `analyze_pairs.py`, `analyze_gloss.py` | Part 2 tables and figures; matched pairs; highlight cues |
 | `image_to_3d/translucency_readout.py` | The soap-trained readout applied to the Part 2 images |
+| `image_to_3d/readout_density.py` | The readout on input images that differ only in density |
 | `image_to_3d/steer_embedding.py` | Zero-1-to-3 with its CLIP embedding moved along the translucency direction |
 | `soap/segment.py`, `soap/finalize.py` | Object regions for the soap photos |
 | `soap/features.py`, `soap/predict.py`, `soap/ratings.py` | Features, rating loader, prediction of the ratings |
