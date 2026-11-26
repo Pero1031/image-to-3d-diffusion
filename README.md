@@ -27,8 +27,9 @@ models' features carry human judgements of translucency. Everything ran on a Qua
 - **Pushing the embedding barely reaches the image.** Zero-1-to-3's CLIP embedding is moved along the
   translucency direction across the whole soap range. The far side gets slightly brighter and softer (17 of 18
   cells), but only about 2% of the push reaches the output, as for random directions. The images stay metal-like.
-- **Gaze follows brightness.** Observers fixate the bright parts of the soap, not where the readout finds
-  translucency.
+- **Gaze follows brightness, not the readout.** An occlusion map of the CLIP readout puts its evidence on a few
+  parts of the soap (in the examples, mostly edges). Observers look there only as much as brightness predicts, and where an
+  observer looked does not predict how they rated the photo.
 
 ![Front-lit studio, low density](image_to_3d/figures/views_stim01_studio_rot000_coef016.png)
 
@@ -294,14 +295,91 @@ layout: other soaps' fixations mapped onto this object's bounding box, with the 
 ![gaze examples](soap/figures/gaze_examples.png)
 
 *Top: the two highest- and two lowest-rated photos with the fixations of 5 observers. Bottom: the DINO readout
-per patch on one colour scale. The signal covers the whole object.*
+per patch on one colour scale. In this map the signal covers the whole object.*
 
 - **Gaze adds nothing to the readout.** Pooling by gaze is no better than by the typical layout (95% CI of the
   difference -0.01 to +0.04 for DINO), and the parts nobody looked at carry as much as the whole object.
 - **Gaze follows brightness.** Fixations land on brighter parts in about 4 of 5 photos, whatever the rating, and
   hardly go where the readout is high (a fifth of the brightness effect; absent for DINO).
-- So the translucency information is spread over the object, and where people look does not change with
-  translucency.
+- So, by this map, the translucency information is spread over the object, and where people look does not change
+  with translucency. The next section shows that this map does not locate what the embedding readout uses.
+
+### Where the readout's evidence is, and whether gaze and ratings follow it
+
+The patch map above applies a readout of pooled patch tokens to each patch. It is not a map of the CLIP embedding
+readout (r = 0.92). Here that readout is tested directly on the photos the observers saw. A disc of 64 pixels
+(1.6 degrees of visual angle) around each object cell is blurred (Gaussian, SD 0.8 degrees), and the drop in the
+readout is recorded (occlusion map O; positive where blurring makes the photo read less translucent). The readout
+is trained with the soap held out, on a 16 x 16 grid (one CLIP patch per cell). Fixations that started within
+0.1 s of image onset are carried over from the fixation cross (median 34 pixels from the centre) and are dropped.
+Predictions were written into the scripts before the run. A code test on placeholder maps had already printed
+the real luminance and patch-map rows of the gaze analysis; the predictions were not changed after it.
+
+| Object cells blurred in the order of | Readout change, mean over 10 steps | Minus random (95% CI) | Photos below random |
+|---|---|---|---|
+| Occlusion map O | -0.29 | -0.18 (-0.21 to -0.16) | 119 / 122 |
+| Luminance | -0.19 | -0.08 (-0.11 to -0.06) | 89 / 122 |
+| Patch map S (CLIP) | -0.12 | -0.01 (-0.03 to +0.01) | 65 / 122 |
+| Random (2 orders) | -0.11 | | |
+
+![occlusion examples](soap/figures/occlusion_examples.png)
+
+*Same photos as above. Middle: occlusion map of the CLIP readout on one scale (red: blurring here lowers the
+readout). Bottom: the CLIP patch map, minus its mean, scaled per photo.*
+
+- **The patch map does not show what the readout uses.** Blurring cells in its order lowers the readout no faster
+  than random order (8% of the effect of the occlusion order), and the two maps are unrelated within the object
+  (mean r = -0.03).
+- **The evidence is concentrated.** The top 10% of cells hold 41% of |O| (patch map: 27%); in the examples they
+  lie mostly along the top edges of the bars. |O| correlates +0.24 with luminance within the object.
+- **To this readout, blur looks less translucent, not more** (predicted the opposite). Blurring the whole photo
+  lowers the readout by 0.36 (in 82 of 122 photos).
+
+Gaze against the maps (5 observers, 3,930 fixations on object cells). Left: map value at fixations minus the
+value expected from the typical layout. Right: a model of which cell is fixated (conditional logit, fitted with
+soaps held out), starting from the typical layout and luminance. The ceiling adds the other four observers'
+fixations on the same photo.
+
+| | At fixations minus typical, SD (95% CI) | Bits per fixation over typical layout + luminance (95% CI) |
+|---|---|---|
+| Luminance | +0.27 (+0.22 to +0.33) | (0.071 bits over the typical layout) |
+| \|O\| | +0.11 (+0.06 to +0.15) | +0.000 (-0.002 to +0.003) |
+| O | +0.01 (-0.03 to +0.05) | +0.002 (-0.002 to +0.005) |
+| Patch map S, CLIP / DINO | +0.04 / +0.06 | +0.000 / +0.001 |
+| All four maps | | +0.007 (-0.000 to +0.015) |
+| Other four observers (ceiling) | | +0.080 (+0.049 to +0.111) |
+
+![gaze gain](soap/figures/gaze_readout_gain.png)
+
+- **Observers look where the readout's evidence is, but only because it is bright.** With the typical layout and
+  luminance in the model, no map adds information. All four maps together add 9% of what the other observers'
+  gaze adds, and the CI touches 0.
+- **Gaze is predictable beyond brightness.** The other observers' fixations add 0.08 bits per fixation, but
+  whatever drives this is not in the readout maps.
+- **Brightness pulls harder after the first two fixations** (+0.22 to +0.29 SD; predicted the opposite).
+
+**Each observer's gaze and their own rating.** Within a photo, did an observer who looked at different parts give
+a different rating? Each measure is taken relative to the photo mean and the observer mean (557 trials; 53 trials
+with no fixation on object cells are left out). V is the readout of the photo blurred everywhere except within
+64 pixels of this observer's fixations.
+
+| Partial r with the observer's own rating (95% CI) | 5 observers | With P003 |
+|---|---|---|
+| V, readout of what this observer looked at | -0.04 (-0.13 to +0.07) | -0.01 |
+| Luminance at fixations | +0.01 (-0.11 to +0.13) | +0.01 |
+| O at fixations | +0.02 (-0.08 to +0.12) | +0.01 |
+| Share of the object left sharp (a control, not a hypothesis) | -0.15 (-0.24 to -0.04) | -0.13 |
+
+![trials](soap/figures/gaze_readout_trials.png)
+
+- **Where an observer looked does not predict how they rated the photo, relative to others.** With about 500
+  trials, partial correlations beyond about 0.13 are ruled out.
+- **The fixated parts carry the readout's information.** Keeping only them sharp (12% of the object, median)
+  gives r = 0.86 with the mean rating, against 0.70 for the fully blurred photo and 0.92 for the sharp one.
+  Whether unfixated parts of the same size would do as well was not tested.
+- **Not planned:** observers rated a photo as less translucent when they spread their fixations over more of it
+  than usual (p = 0.001 by permutation; also with P003). The measure was entered as a control, so this needs
+  a new test before it counts. The direction of cause is unknown.
 
 ### Limits
 
@@ -310,6 +388,9 @@ per patch on one colour scale. The signal covers the whole object.*
 - The readout is trained on soap photos and applied to rendered blobs. It orders the rendered inputs by density,
   but whether observers see the generated far side as less translucent has not been measured.
 - The steering test used one model, one seed and two control directions.
+- The occlusion map uses one blur and one disc size, and blur is not the same as hiding a region from a person,
+  who still sees it in the periphery. Each photo was rated once per observer, so an observer's deviation from the
+  others includes rating noise of unknown size.
 
 ## Related work
 
@@ -346,6 +427,7 @@ reported.
 | `soap/features.py`, `soap/predict.py`, `soap/ratings.py` | Features, rating loader, prediction of the ratings |
 | `soap/within_pair.py` | Two photos of the same soap; image-statistic cues |
 | `soap/patch_features.py`, `soap/gaze_model.py` | Patch features of the photos; gaze against the model features |
+| `soap/occlusion_maps.py`, `soap/gaze_readout.py` | Occlusion maps of the CLIP readout; gaze and each observer's rating against them |
 
 ## Setup
 

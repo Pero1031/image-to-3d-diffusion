@@ -1,0 +1,54 @@
+{
+ "readout_r": 0.9231730450225402,
+ "cosine_to_saved_median": 1.0,
+ "fixations_dropped_early": 476,
+ "auc": {
+  "occlusion": -0.29341513873960706,
+  "patch_clip": -0.12390802279755311,
+  "luminance": -0.19352731586380517,
+  "random1": -0.10957631418836089,
+  "random2": -0.1098998094074321
+ },
+ "occlusion_minus_random": {
+  "mean": -0.18367707694171057,
+  "ci": [
+   -0.20569141886433848,
+   -0.1605433454681142
+  ],
+  "images_below_random": 119
+ },
+ "patch_clip_minus_random": {
+  "mean": -0.014169960999656634,
+  "ci": [
+   -0.03285187831946941,
+   0.005209548645435194
+  ],
+  "images_below_random": 65
+ },
+ "luminance_minus_random": {
+  "mean": -0.08378925406590873,
+  "ci": [
+   -0.10874905786842164,
+   -0.05742442594110316
+  ],
+  "images_below_random": 89
+ },
+ "patch_share_of_occlusion_gap": {
+  "value": 0.07714605020719834,
+  "ci": [
+   -0.03427523542053236,
+   0.1743241474763765
+  ]
+ },
+ "shape": {
+  "whole_blur_change": -0.35532566845741365,
+  "whole_blur_up_images": 40,
+  "O_mean": 0.03090992355326184,
+  "O_negative_share": 0.43210968597965504,
+  "top10_share_absO": 0.4056117011576665,
+  "top10_share_absS_clip": 0.26907866819479215,
+  "r_absO_luminance": 0.2434790149392275,
+  "r_O_luminance": 0.20180678026228407,
+  "r_O_S_clip": -0.027480685672735795
+ }
+}
