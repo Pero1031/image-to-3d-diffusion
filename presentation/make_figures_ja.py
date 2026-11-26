@@ -1,6 +1,7 @@
 """説明用の図（日本語）。解析の結果と画像から作るだけで、新しい解析はしない。
 
     python presentation/make_figures_ja.py        # presentation/figures_ja/ に PNG を書く
+    python presentation/make_figures_ja.py --views-en   # 見え方の図の英語版だけ（presentation/figures_en/）
 
 石けんの写真と評定（研究室のデータ）を使うので、リポジトリの外の data/ と評定ファイルが必要。
 """
@@ -160,23 +161,45 @@ def fig_soaps():
 
 
 # ------------------------------------------------------------------ 図 3: 正解と生成の見た目
-def fig_views(cond, coef, name):
-    rows = (("正解（半透明）", lambda az: gt_image(cond, coef, az, bg=SHOW_BG)[0]),
-            ("不透明の対照", lambda az: gt_image(cond, coef, az, opaque=True, bg=SHOW_BG)[0]),
-            ("Zero-1-to-3 の生成", lambda az: on_gray(gen_image(cond, f"zero123_coef{coef}_az{az:03d}_seed0.png")[0])),
-            ("TripoSR の生成", lambda az: on_gray(fill_frame(gen_image(cond, f"triposr_coef{coef}_az{az:03d}.png")[0]))))
-    fig, axes = plt.subplots(len(rows), len(AZ), figsize=(9.6, 10.2))
-    for r, (label, get) in enumerate(rows):
+VIEWS_EN = {"rows": ("Truth (translucent)", "Opaque control", "Zero-1-to-3", "TripoSR"),
+            "az": {0: "0° (input view)", 90: "90°", 180: "180° (back)", 270: "270°"},
+            "shape": {"stim01": "Shape A", "stim02": "Shape B"}, "light": {"studio": "studio", "rustig_koppie": "outdoor"},
+            "dir": {("studio", 0): "front light", ("studio", 180): "back light", ("rustig_koppie", 315): "front light",
+                    ("rustig_koppie", 225): "side light", ("rustig_koppie", 135): "back light"},
+            "dens": {"016": "low scattering", "128": "medium scattering", "512": "high scattering"}}
+
+
+def fig_views(cond, coef, name, lang="ja", out=None):
+    """lang="en" は英語のラベル（ポートフォリオの英語ページ用）。画像は日本語版と同じ。"""
+    if lang == "en":
+        labels, az_lab = VIEWS_EN["rows"], VIEWS_EN["az"]
+        sup = (f"{VIEWS_EN['shape'][cond[0]]}, {VIEWS_EN['light'][cond[1]]}, {VIEWS_EN['dir'][(cond[1], cond[2])]}, "
+               f"{VIEWS_EN['dens'][coef]}: the only input is the top-left image; the models draw the unseen sides")
+        font = {"family": "DejaVu Sans"}
+    else:
+        labels, az_lab = ("正解（半透明）", "不透明の対照", "Zero-1-to-3 の生成", "TripoSR の生成"), AZ_JA
+        sup = f"{cond_ja(cond)}・{DENS[coef]}：入力は左上の1枚だけ。見えていない側をモデルが描く"
+        font = {}
+    getters = (lambda az: gt_image(cond, coef, az, bg=SHOW_BG)[0],
+               lambda az: gt_image(cond, coef, az, opaque=True, bg=SHOW_BG)[0],
+               lambda az: on_gray(gen_image(cond, f"zero123_coef{coef}_az{az:03d}_seed0.png")[0]),
+               lambda az: on_gray(fill_frame(gen_image(cond, f"triposr_coef{coef}_az{az:03d}.png")[0])))
+    fig, axes = plt.subplots(len(getters), len(AZ), figsize=(9.6, 10.2))
+    for r, (label, get) in enumerate(zip(labels, getters)):
         for c, az in enumerate(AZ):
             ax = axes[r, c]
             ax.imshow(get(az)); blank(ax)
             if r == 0:
-                ax.set_title(AZ_JA[az], fontsize=11)
+                ax.set_title(az_lab[az], fontsize=11, fontdict=font)
             if c == 0:
-                ax.set_ylabel(label, fontsize=12)
-    fig.suptitle(f"{cond_ja(cond)}・{DENS[coef]}：入力は左上の1枚だけ。見えていない側をモデルが描く", fontsize=12, y=1.0)
+                ax.set_ylabel(label, fontsize=12, fontdict=font)
+    fig.suptitle(sup, fontsize=12, y=1.0, fontfamily=font.get("family", plt.rcParams["font.family"]))
     fig.tight_layout()
-    save(fig, name)
+    if out is None:
+        save(fig, name)
+    else:
+        out.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out / name); plt.close(fig); print("wrote", out / name)
 
 
 # ------------------------------------------------------------------ グラフの共通部品
@@ -445,6 +468,10 @@ def fig_steer_images(cond, coef):
 
 
 if __name__ == "__main__":
+    if "--views-en" in sys.argv:      # 英語ページ用の見え方の図だけ（研究室のデータは不要）
+        fig_views(("stim01", "studio", 0), "128", "03a_truth_and_generated_front_light.png", lang="en",
+                  out=ROOT / "presentation" / "figures_en")
+        sys.exit()
     fig_stimuli()
     fig_soaps()
     fig_views(("stim01", "studio", 0), "128", "03a_正解と生成_順光.png")
