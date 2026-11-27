@@ -31,12 +31,13 @@ MASKS = ROOT / "data" / "soap_masks" / "final"
 
 for f in ("meiryo.ttc", "meiryob.ttc"):       # メイリオ: 画面・投影で読みやすく、数字の幅が詰まる（"0.4" が "0. 4" にならない）
     font_manager.fontManager.addfont(f"C:/Windows/Fonts/{f}")
-INK, INK2, GRID = "#0b0b0b", "#52514e", "#e5e4e0"
+# 文字・目盛り・軸の線は黒。格子線は、はっきり見える濃さの灰色にする（薄い灰色は読めない）。
+INK, GRID = "#0b0b0b", "#b0b0b0"
 TRUTH, MODEL, REF = "#2a78d6", "#eb6834", "#8a8984"     # 正解（半透明）、生成モデル、対照・画像統計量
 plt.rcParams.update({
     "font.family": "Meiryo", "font.size": 13, "axes.unicode_minus": True,
-    "axes.spines.top": False, "axes.spines.right": False, "axes.edgecolor": INK2, "axes.labelcolor": INK,
-    "axes.linewidth": 1.0, "xtick.color": INK2, "ytick.color": INK2, "xtick.labelsize": 12, "ytick.labelsize": 12,
+    "axes.spines.top": False, "axes.spines.right": False, "axes.edgecolor": INK, "axes.labelcolor": INK,
+    "axes.linewidth": 1.0, "xtick.color": INK, "ytick.color": INK, "xtick.labelsize": 12, "ytick.labelsize": 12,
     "text.color": INK, "axes.titlesize": 14, "axes.labelsize": 13,
     "savefig.dpi": 200, "savefig.bbox": "tight", "figure.facecolor": "white"})
 
@@ -218,7 +219,7 @@ def caption(name, text):
 
 def ytitle(ax, text):
     """縦書きの軸ラベルの代わりに、軸の左上に横書きで置く。"""
-    ax.text(0, 1.02, text, transform=ax.transAxes, ha="left", va="bottom", fontsize=12, color=INK2)
+    ax.text(0, 1.02, text, transform=ax.transAxes, ha="left", va="bottom", fontsize=12, color=INK)
 
 
 def grid(ax, axis="both"):
@@ -231,7 +232,7 @@ def title(fig, text, sub=None):
     h = fig.get_size_inches()[1]
     fig.suptitle(text, x=0.01, y=1.0 if sub is None else 0.985 + 0.7 / h, ha="left", fontsize=16)
     if sub:
-        fig.text(0.01, 0.985, sub, ha="left", va="bottom", fontsize=12, color=INK2)
+        fig.text(0.01, 0.985, sub, ha="left", va="bottom", fontsize=12, color=INK)
 
 
 def num(v, digits=2):
@@ -260,7 +261,7 @@ def fig_far_stats(truth, gen, sd):
     for ax, (j, head, (lo, hi), side, note) in zip(axes, panels):
         # 主張の側（生成が暗い／陰影が強い）を薄く塗り、そこに数を書く
         ax.fill_between([lo, hi], [lo, hi], lo if side == "below" else hi, color="#f3f2ef", lw=0)
-        ax.plot([lo, hi], [lo, hi], color=INK2, lw=1.2)
+        ax.plot([lo, hi], [lo, hi], color=INK, lw=1.2)
         ax.scatter(truth[:, j], gen[:, j], s=80, color=MODEL, edgecolor="white", lw=1.5, zorder=3)
         ax.set_xlim(lo, hi); ax.set_ylim(lo, hi); ax.set_aspect("equal")
         w = hi - lo
@@ -268,7 +269,7 @@ def fig_far_stats(truth, gen, sd):
             ax.text(hi - 0.03 * w, lo + 0.03 * w, note, ha="right", va="bottom", fontsize=13)
         else:
             ax.text(lo + 0.03 * w, hi - 0.03 * w, note, ha="left", va="top", fontsize=13)
-        ax.text(lo + 0.86 * w, lo + 0.86 * w, "正解と同じ", ha="center", va="top", fontsize=11, color=INK2,
+        ax.text(lo + 0.86 * w, lo + 0.86 * w, "正解と同じ", ha="center", va="top", fontsize=11, color=INK,
                 rotation=45, rotation_mode="anchor", transform_rotates_text=True)
         ax.set_title(head, loc="left", pad=28)
         ax.set_xlabel("正解（半透明）の裏側")
@@ -301,8 +302,8 @@ def fig_predict():
         ax.barh(yk, r, height=0.6, color=color, lw=0)
         ax.text(r + 0.012, yk, f"{r:.2f}", va="center", fontsize=14,
                 bbox=dict(boxstyle="square,pad=0.1", fc="white", ec="none"), zorder=4)
-    ax.axvline(ceiling, color=INK2, lw=1.2, ls=(0, (2, 2)), zorder=3)
-    ax.text(ceiling, 6.05, f"評定者どうしの一致から見た上限 {ceiling:.2f}", ha="right", va="bottom", fontsize=11, color=INK2)
+    ax.axvline(ceiling, color=INK, lw=1.2, ls=(0, (2, 2)), zorder=3)
+    ax.text(ceiling, 6.05, f"評定者どうしの一致から見た上限 {ceiling:.2f}", ha="right", va="bottom", fontsize=11, color=INK)
     ax.set_yticks(ys); ax.set_yticklabels([r[0] for r in rows], fontsize=13)
     ax.set_ylim(0, 6.4); ax.set_xlim(0, 1.06); ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
     ax.spines["left"].set_visible(False); ax.tick_params(axis="y", length=0)
@@ -340,13 +341,13 @@ def fig_within():
         p = (pred[P[:, 0]] - pred[P[:, 1]]) * sgn
         a = np.abs(d)
         ax.axhspan(0, np.median(a), color="#f3f2ef", lw=0)
-        ax.axvline(0, color=INK2, lw=1.2)
+        ax.axvline(0, color=INK, lw=1.2)
         ax.scatter(p[large], a[large], s=70, color=color, edgecolor="white", lw=1.2, zorder=3)
         ax.scatter(p[~large], a[~large], s=40, color=color, alpha=0.35, lw=0, zorder=3)
         n_ok = int((p[large] > 0).sum())
         ax.set_title(f"{lab}：{large.sum()}組中 {n_ok}組で向きが合う", loc="left", pad=28)
-        ax.text(lim * 0.96, top * 0.97, "向きが合う →", ha="right", va="top", fontsize=12, color=INK2)
-        ax.text(-lim * 0.96, top * 0.97, "← 逆向き", ha="left", va="top", fontsize=12, color=INK2)
+        ax.text(lim * 0.96, top * 0.97, "向きが合う →", ha="right", va="top", fontsize=12, color=INK)
+        ax.text(-lim * 0.96, top * 0.97, "← 逆向き", ha="left", va="top", fontsize=12, color=INK)
         ax.set_xlim(-lim, lim); ax.set_ylim(0, top)
         ax.set_xlabel("予測された差（評定が高いほうの写真 − もう一方）")
         grid(ax)
@@ -418,7 +419,7 @@ def fig_steer_curves(truth_far):
     fig, axes = plt.subplots(1, 4, figsize=(13, 4.9), sharey=True)
     for ax, (m, lab) in zip(axes, M):
         ax.axhline(100, color=TRUTH, lw=2.2)
-        ax.axhline(0, color=INK2, lw=1)
+        ax.axhline(0, color=INK, lw=1)
         for c in ("control1", "control2"):
             ax.plot([-2, 0, 2], [pct(m, b[f"{c}_-2"]["far"][m]), 0, pct(m, b[f"{c}_+2"]["far"][m])], "-s",
                     color=REF, lw=2, ms=7, mec="white", mew=1)
